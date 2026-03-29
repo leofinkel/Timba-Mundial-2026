@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
 import { GAME_RULES_BRIEF_LINES } from '@/constants/gameRulesBrief';
+import { PUBLIC_NAV_LINKS } from '@/constants/navigation';
 
 const HomePage = async () => {
   const supabase = await createServerClient();
@@ -31,12 +32,24 @@ const HomePage = async () => {
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-tight text-white sm:text-xl">
                 Timba Mundial 2026
               </span>
             </div>
+            <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:w-auto sm:gap-3">
+              {PUBLIC_NAV_LINKS.map((link) => (
+                <Button
+                  key={link.href}
+                  variant="ghost"
+                  className="h-8 px-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white sm:h-9 sm:px-3 sm:text-sm"
+                  asChild
+                >
+                  <Link href={link.href}>{link.label}</Link>
+                </Button>
+              ))}
+            </nav>
             <div className="flex shrink-0 gap-2 sm:gap-3">
               <Button
                 variant="ghost"

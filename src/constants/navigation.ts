@@ -3,3 +3,9 @@ export const MAIN_NAV_LINKS = [
   { href: '/fixture', label: 'Fixture' },
   { href: '/rankings', label: 'Posiciones' },
 ] as const;
+
+export const PUBLIC_NAV_LINKS = [
+  { href: '/fixture', label: 'Fixture' },
+  { href: '/rankings', label: 'Clasificación' },
+  { href: '/#landing-rules', label: 'Reglas' },
+] as const;

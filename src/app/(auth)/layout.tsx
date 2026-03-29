@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { PUBLIC_NAV_LINKS } from '@/constants/navigation';
 
 type AuthLayoutProps = {
   children: React.ReactNode;
@@ -34,6 +36,18 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
               Timba Mundial 2026
             </span>
           </Link>
+          <nav className="mt-4 flex items-center justify-center gap-2">
+            {PUBLIC_NAV_LINKS.map((link) => (
+              <Button
+                key={link.href}
+                variant="ghost"
+                className="h-8 px-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white sm:h-9 sm:px-3 sm:text-sm"
+                asChild
+              >
+                <Link href={link.href}>{link.label}</Link>
+              </Button>
+            ))}
+          </nav>
         </header>
 
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col">{children}</main>
