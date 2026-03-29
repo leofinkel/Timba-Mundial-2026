@@ -1,0 +1,134 @@
+'use client';
+
+import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminClassificationTab } from '@/components/admin/AdminClassificationTab';
+import { AdminFixtureTab } from '@/components/admin/AdminFixtureTab';
+import { AdminPaymentsTab } from '@/components/admin/AdminPaymentsTab';
+import { AdminResultsTab } from '@/components/admin/AdminResultsTab';
+import { AdminRulesTab } from '@/components/admin/AdminRulesTab';
+import { AdminStatsTab } from '@/components/admin/AdminStatsTab';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import type { MatchRow } from '@/repositories/matchRepository';
+import type { AdminClassificationEntry, AdminGameRule } from '@/types/admin';
+import type { UserProfile } from '@/types/auth';
+import { ChevronDown } from 'lucide-react';
+
+interface MatchOption {
+  id: string;
+  label: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+}
+
+interface TeamOption {
+  id: string;
+  name: string;
+}
+
+interface DashboardStatsPayload {
+  totalUsers: number;
+  paidUsers: number;
+  predictionsSubmitted: number;
+  matchesWithResults: number;
+}
+
+interface AdminDashboardPanelProps {
+  users: UserProfile[];
+  matchOptions: MatchOption[];
+  teams: TeamOption[];
+  stats: DashboardStatsPayload;
+  rules: AdminGameRule[];
+  matches: MatchRow[];
+  classification: AdminClassificationEntry[];
+}
+
+export const AdminDashboardPanel = ({
+  users,
+  matchOptions,
+  teams,
+  stats,
+  rules,
+  matches,
+  classification,
+}: AdminDashboardPanelProps) => {
+  const [activeTab, setActiveTab] = useState('payments');
+  const isAbmSelected =
+    activeTab === 'rules' || activeTab === 'fixture' || activeTab === 'classification';
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-emerald-950/5 p-2 sm:grid-cols-4">
+        <TabsTrigger
+          value="payments"
+          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+        >
+          Pagos
+        </TabsTrigger>
+        <TabsTrigger
+          value="results"
+          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+        >
+          Resultados
+        </TabsTrigger>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                'h-9 justify-between border-input bg-background px-3 font-medium hover:bg-accent hover:text-accent-foreground',
+                isAbmSelected && 'bg-emerald-600 text-white hover:bg-emerald-600/90 hover:text-white',
+              )}
+            >
+              ABM
+              <ChevronDown className="ml-2 size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuItem onSelect={() => setActiveTab('rules')}>Reglamento</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setActiveTab('fixture')}>Fixture</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setActiveTab('classification')}>
+              Clasificación
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <TabsTrigger
+          value="stats"
+          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+        >
+          Estadísticas
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="payments" className="mt-6">
+        <AdminPaymentsTab users={users} />
+      </TabsContent>
+      <TabsContent value="results" className="mt-6">
+        <AdminResultsTab matchOptions={matchOptions} teams={teams} />
+      </TabsContent>
+      <TabsContent value="rules" className="mt-6">
+        <AdminRulesTab rules={rules} />
+      </TabsContent>
+      <TabsContent value="fixture" className="mt-6">
+        <AdminFixtureTab matches={matches} teams={teams} />
+      </TabsContent>
+      <TabsContent value="classification" className="mt-6">
+        <AdminClassificationTab classification={classification} users={users} />
+      </TabsContent>
+      <TabsContent value="stats" className="mt-6">
+        <AdminStatsTab
+          totalUsers={stats.totalUsers}
+          paidUsers={stats.paidUsers}
+          predictionsSubmitted={stats.predictionsSubmitted}
+          matchesWithResults={stats.matchesWithResults}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+};
