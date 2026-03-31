@@ -1,13 +1,28 @@
+import { redirect } from 'next/navigation';
+
 import { getCurrentUser } from '@/actions/auth';
 import { MainUserProvider } from '@/components/layout/MainUserProvider';
 import { Navbar } from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { PUBLIC_NAV_LINKS } from '@/constants/navigation';
+import { createServerClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 
 const MainLayout = async ({ children }: { children: React.ReactNode }) => {
   const result = await getCurrentUser();
   const user = result.success ? result.data : null;
+
+  if (!user) {
+    const supabase = await createServerClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    if (authUser) {
+      await supabase.auth.signOut();
+      redirect('/login');
+    }
+  }
 
   return (
     <MainUserProvider user={user}>
