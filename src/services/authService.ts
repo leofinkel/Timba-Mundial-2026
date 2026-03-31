@@ -49,6 +49,26 @@ export const updateUserProfile = async (
   }
 };
 
+export const updateUserAvatarUrl = async (
+  userId: string,
+  avatarUrl: string | null,
+): Promise<UserProfile> => {
+  try {
+    const supabase = await createServerClient();
+    const updated = await profileRepository.updateProfileAvatarUrl(
+      supabase,
+      userId,
+      avatarUrl,
+    );
+    log.info({ userId }, 'updateUserAvatarUrl');
+    return updated;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ userId, err: message }, 'updateUserAvatarUrl failed');
+    throw new Error(`updateUserAvatarUrl failed: ${message}`);
+  }
+};
+
 export const isUserPaid = async (userId: string): Promise<boolean> => {
   try {
     const supabase = await createServerClient();

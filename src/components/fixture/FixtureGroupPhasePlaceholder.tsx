@@ -6,14 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export const FixtureGroupPhasePlaceholder = () => {
   return (
-    <Card className="border-emerald-950/10 shadow-md">
+    <Card className="border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
       <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <div className="bg-emerald-600/10 text-emerald-700 flex size-14 items-center justify-center rounded-2xl">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300">
           <ClipboardList className="size-7" />
         </div>
         <div>
-          <p className="font-semibold text-emerald-900">Fase de grupos</p>
-          <p className="text-muted-foreground mt-1 max-w-sm text-sm">
+          <p className="font-semibold text-emerald-200">Fase de grupos</p>
+          <p className="mt-1 max-w-sm text-sm text-zinc-400">
             El editor de partidos de grupos se agregará aquí. Por ahora podés revisar el estado de
             tu predicción arriba.
           </p>

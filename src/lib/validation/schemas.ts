@@ -51,6 +51,13 @@ export const saveSpecialResultsSchema = z.object({
   bestPlayer: z.string().min(1),
 });
 
+export const updateProfileSchema = z.object({
+  displayName: z
+    .string()
+    .min(2, 'Mínimo 2 caracteres')
+    .max(100, 'Máximo 100 caracteres'),
+});
+
 export const adminResultSchema = z.object({
   matchId: z.string().min(1),
   homeGoals: z.number().int().min(0),

@@ -16,6 +16,7 @@ CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   display_name TEXT NOT NULL,
+  avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
   payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

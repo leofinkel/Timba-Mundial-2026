@@ -2,7 +2,7 @@ import 'server-only';
 
 import { PRIZE_DISTRIBUTION } from '@/constants/scoring';
 import { createServiceLogger } from '@/lib/logger';
-import { createServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import * as profileRepository from '@/repositories/profileRepository';
 import * as userScoreRepository from '@/repositories/userScoreRepository';
 import type { Leaderboard, PrizePool, RankingEntry } from '@/types/ranking';
@@ -14,7 +14,7 @@ const POOL_UNIT_PER_PAID_USER = 1;
 
 export const getPrizePool = async (): Promise<PrizePool> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const paidUsersCount = await profileRepository.countPaidProfiles(supabase);
     const totalPool = paidUsersCount * POOL_UNIT_PER_PAID_USER;
     const prizePool: PrizePool = {
@@ -35,7 +35,7 @@ export const getPrizePool = async (): Promise<PrizePool> => {
 
 export const getLeaderboard = async (): Promise<Leaderboard> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const [scores, profiles, prizePool] = await Promise.all([
       userScoreRepository.listScoresOrderedByPoints(supabase),
       profileRepository.listAllProfiles(supabase),
@@ -83,7 +83,7 @@ export const getUserRank = async (
   userId: string,
 ): Promise<{ rank: number | null; totalPoints: number }> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const score = await userScoreRepository.getUserScoreByUserId(
       supabase,
       userId,

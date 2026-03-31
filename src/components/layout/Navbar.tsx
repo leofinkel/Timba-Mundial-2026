@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 import { MAIN_NAV_LINKS } from '@/constants/navigation';
 import { logoutAction } from '@/actions/auth';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +19,7 @@ import {
 import { MobileNav } from '@/components/layout/MobileNav';
 import type { UserProfile } from '@/types/auth';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, LogOut, Shield, UserRound } from 'lucide-react';
+import { LogOut, Shield, User, UserRound } from 'lucide-react';
 
 interface NavbarProps {
   user: UserProfile;
@@ -111,8 +111,15 @@ export const Navbar = ({ user }: NavbarProps) => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative size-9 rounded-full p-0">
                 <Avatar className="size-9 border border-emerald-600/30">
+                  {user.avatarUrl ? (
+                    <AvatarImage src={user.avatarUrl} alt={user.displayName} />
+                  ) : null}
                   <AvatarFallback className="bg-emerald-600/15 text-sm font-semibold text-emerald-800">
-                    <UserRound className="size-4" />
+                    {user.avatarUrl ? (
+                      initialsFromName(user.displayName)
+                    ) : (
+                      <UserRound className="size-4" />
+                    )}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -127,17 +134,16 @@ export const Navbar = ({ user }: NavbarProps) => {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <CheckCircle2 className="mr-2 size-4 text-emerald-600" />
-                Sesión iniciada
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="cursor-pointer">
+                  <User className="mr-2 size-4" />
+                  Mi perfil
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled className="text-xs">
-                Usuario: {initialsFromName(user.displayName)}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem className="sm:hidden" disabled>
                 <Badge className={paymentBadgeClass}>{paymentBadgeLabel}</Badge>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-red-600 focus:text-red-600"
                 onSelect={() => {

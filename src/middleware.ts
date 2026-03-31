@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-const PROTECTED_PREFIXES = ['/dashboard', '/fixture', '/rankings', '/admin'] as const;
+const PROTECTED_PREFIXES = ['/dashboard', '/admin', '/profile'] as const;
 
 export const middleware = async (request: NextRequest) => {
   const { response, user } = await updateSession(request);
@@ -17,5 +17,5 @@ export const middleware = async (request: NextRequest) => {
 };
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/fixture/:path*', '/rankings/:path*', '/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/profile/:path*'],
 };

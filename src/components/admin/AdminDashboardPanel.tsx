@@ -65,16 +65,16 @@ export const AdminDashboardPanel = ({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-emerald-950/5 p-2 sm:grid-cols-4">
+      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 border border-zinc-800/80 bg-zinc-900/50 p-2 sm:grid-cols-4">
         <TabsTrigger
           value="payments"
-          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+          className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
         >
           Pagos
         </TabsTrigger>
         <TabsTrigger
           value="results"
-          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+          className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
         >
           Resultados
         </TabsTrigger>
@@ -83,7 +83,7 @@ export const AdminDashboardPanel = ({
             <Button
               variant="outline"
               className={cn(
-                'h-9 justify-between border-input bg-background px-3 font-medium hover:bg-accent hover:text-accent-foreground',
+                'h-9 justify-between border-zinc-700 bg-zinc-900/70 px-3 font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white',
                 isAbmSelected && 'bg-emerald-600 text-white hover:bg-emerald-600/90 hover:text-white',
               )}
             >
@@ -91,17 +91,30 @@ export const AdminDashboardPanel = ({
               <ChevronDown className="ml-2 size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem onSelect={() => setActiveTab('rules')}>Reglamento</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setActiveTab('fixture')}>Fixture</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setActiveTab('classification')}>
+          <DropdownMenuContent align="start" className="w-48 border-zinc-800 bg-zinc-950 text-zinc-100">
+            <DropdownMenuItem
+              className="focus:bg-zinc-800 focus:text-white"
+              onSelect={() => setActiveTab('rules')}
+            >
+              Reglamento
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="focus:bg-zinc-800 focus:text-white"
+              onSelect={() => setActiveTab('fixture')}
+            >
+              Fixture
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="focus:bg-zinc-800 focus:text-white"
+              onSelect={() => setActiveTab('classification')}
+            >
               Clasificación
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <TabsTrigger
           value="stats"
-          className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+          className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
         >
           Estadísticas
         </TabsTrigger>

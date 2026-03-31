@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerClient } from '@/lib/supabase/server';
 import { loginSchema, registerSchema } from '@/lib/validation/schemas';
 import { getUserProfile } from '@/services/authService';
@@ -26,11 +27,47 @@ export const loginAction = async (
     };
   }
 
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
   const supabase = await createServerClient();
   const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
+    email: normalizedEmail,
     password: parsed.data.password,
   });
+
+  if (error && /email not confirmed/i.test(error.message)) {
+    const adminClient = createAdminClient();
+    const { data: usersData, error: listUsersError } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (!listUsersError) {
+      const userToConfirm = usersData.users.find(
+        (user) => user.email?.trim().toLowerCase() === normalizedEmail,
+      );
+
+      if (userToConfirm) {
+        const { error: confirmError } = await adminClient.auth.admin.updateUserById(
+          userToConfirm.id,
+          {
+            email_confirm: true,
+          },
+        );
+
+        if (!confirmError) {
+          const { error: retryError } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password: parsed.data.password,
+          });
+
+          if (!retryError) {
+            revalidatePath('/', 'layout');
+            return { success: true, data: null };
+          }
+        }
+      }
+    }
+  }
 
   if (error) {
     return { success: false, error: error.message };
@@ -46,6 +83,7 @@ export const registerAction = async (
   const parsed = registerSchema.safeParse({
     email: String(formData.get('email') ?? ''),
     password: String(formData.get('password') ?? ''),
+    confirmPassword: String(formData.get('confirmPassword') ?? ''),
     firstName: String(formData.get('firstName') ?? ''),
     lastName: String(formData.get('lastName') ?? ''),
   });
@@ -57,11 +95,12 @@ export const registerAction = async (
     };
   }
 
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
   const displayName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
 
   const supabase = await createServerClient();
-  const { error } = await supabase.auth.signUp({
-    email: parsed.data.email,
+  const { data: signUpData, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
     password: parsed.data.password,
     options: {
       data: {
@@ -73,6 +112,21 @@ export const registerAction = async (
 
   if (error) {
     return { success: false, error: error.message };
+  }
+
+  if (signUpData.user && !signUpData.session) {
+    const adminClient = createAdminClient();
+    const { error: confirmError } = await adminClient.auth.admin.updateUserById(
+      signUpData.user.id,
+      { email_confirm: true },
+    );
+
+    if (!confirmError) {
+      await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: parsed.data.password,
+      });
+    }
   }
 
   revalidatePath('/', 'layout');

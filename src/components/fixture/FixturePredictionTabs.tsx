@@ -19,22 +19,22 @@ export const FixturePredictionTabs = ({
   return (
     <div className="space-y-6">
       <Tabs defaultValue="groups" className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-emerald-950/5 p-2 sm:grid-cols-3">
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 border border-zinc-800/80 bg-zinc-900/50 p-2 sm:grid-cols-3">
           <TabsTrigger
             value="groups"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
           >
             Fase de Grupos
           </TabsTrigger>
           <TabsTrigger
             value="knockout"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
           >
             Eliminatorias
           </TabsTrigger>
           <TabsTrigger
             value="specials"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
           >
             Predicciones Especiales
           </TabsTrigger>
@@ -50,8 +50,8 @@ export const FixturePredictionTabs = ({
         </TabsContent>
       </Tabs>
 
-      <div className="border-emerald-950/10 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-muted-foreground text-sm">
+      <div className="flex flex-col gap-2 border-t border-zinc-800/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-zinc-400">
           {saveDisabled && saveDisabledReason ? saveDisabledReason : 'Guardá cuando termines de cargar el fixture.'}
         </p>
         <Button

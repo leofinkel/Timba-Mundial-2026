@@ -8,6 +8,7 @@ type ProfileRow = {
   id: string;
   email: string;
   display_name: string;
+  avatar_url: string | null;
   role: string;
   payment_status: string;
   created_at: string;
@@ -18,6 +19,7 @@ const mapRow = (row: ProfileRow): UserProfile => ({
   id: row.id,
   email: row.email,
   displayName: row.display_name,
+  avatarUrl: row.avatar_url,
   role: row.role as UserRole,
   paymentStatus: row.payment_status as PaymentStatus,
   createdAt: row.created_at,
@@ -118,6 +120,22 @@ export const updatePaymentStatus = async (
     .single();
 
   if (error) throw new Error(`profiles.update payment_status failed: ${error.message}`);
+  return mapRow(data as ProfileRow);
+};
+
+export const updateProfileAvatarUrl = async (
+  supabase: SupabaseClient,
+  userId: string,
+  avatarUrl: string | null,
+): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`profiles.update avatar_url failed: ${error.message}`);
   return mapRow(data as ProfileRow);
 };
 

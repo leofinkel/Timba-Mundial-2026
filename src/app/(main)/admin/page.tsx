@@ -51,7 +51,7 @@ const AdminPage = async () => {
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight text-emerald-950 sm:text-3xl">
           Panel admin
         </h1>

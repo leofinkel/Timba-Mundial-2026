@@ -7,7 +7,7 @@ import type { UserProfile } from '@/types/auth';
 const MainUserContext = createContext<UserProfile | null>(null);
 
 interface MainUserProviderProps {
-  user: UserProfile;
+  user: UserProfile | null;
   children: React.ReactNode;
 }
 

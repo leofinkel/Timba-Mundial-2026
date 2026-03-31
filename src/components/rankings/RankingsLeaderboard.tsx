@@ -39,7 +39,7 @@ const movementIcon = (movement: string) => {
     case 'down':
       return <ChevronsDown className="size-4 text-red-600" aria-hidden />;
     case 'new':
-      return <Badge variant="secondary" className="text-xs">Nuevo</Badge>;
+      return <Badge className="border-emerald-500/30 bg-emerald-500/15 text-xs text-emerald-200">Nuevo</Badge>;
     default:
       return <Minus className="text-muted-foreground size-4" aria-hidden />;
   }
@@ -69,10 +69,10 @@ export const RankingsLeaderboard = ({
   const [openUserId, setOpenUserId] = useState<string | null>(null);
 
   return (
-    <Card className="border-emerald-950/10 overflow-hidden shadow-md">
+    <Card className="mx-auto w-full max-w-5xl overflow-hidden border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-lg">Tabla de posiciones</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-lg text-white">Tabla de posiciones</CardTitle>
+        <CardDescription className="text-zinc-400">
           Actualizado:{' '}
           {new Date(leaderboard.lastUpdated).toLocaleString('es-AR', {
             dateStyle: 'short',
@@ -84,18 +84,18 @@ export const RankingsLeaderboard = ({
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-emerald-950/10 hover:bg-transparent">
-                <TableHead className="w-10">#</TableHead>
-                <TableHead className="w-12">Mov.</TableHead>
-                <TableHead>Jugador</TableHead>
-                <TableHead className="text-right">Pts</TableHead>
+              <TableRow className="border-zinc-800/80 bg-emerald-500/10 hover:bg-emerald-500/10">
+                <TableHead className="w-10 text-zinc-300">#</TableHead>
+                <TableHead className="w-12 text-zinc-300">Mov.</TableHead>
+                <TableHead className="text-zinc-300">Jugador</TableHead>
+                <TableHead className="text-right text-zinc-300">Pts</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {leaderboard.entries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground py-10 text-center">
+                  <TableCell colSpan={5} className="py-10 text-center text-zinc-500">
                     Todavía no hay puntos cargados.
                   </TableCell>
                 </TableRow>
@@ -107,52 +107,52 @@ export const RankingsLeaderboard = ({
                     <Fragment key={entry.userId}>
                       <TableRow
                         className={cn(
-                          'border-emerald-950/10 cursor-pointer transition-colors',
-                          isSelf && 'bg-emerald-600/10 hover:bg-emerald-600/15',
-                          !isSelf && 'hover:bg-emerald-950/[0.03]',
+                          'cursor-pointer border-zinc-800/80 transition-colors',
+                          isSelf && 'bg-emerald-500/15 hover:bg-emerald-500/20',
+                          !isSelf && 'hover:bg-zinc-800/60',
                         )}
                         onClick={() => setOpenUserId(open ? null : entry.userId)}
                       >
-                        <TableCell className="font-bold tabular-nums text-emerald-900">
+                        <TableCell className="font-bold tabular-nums text-emerald-300">
                           {entry.rank}
                         </TableCell>
                         <TableCell>{movementIcon(entry.movement)}</TableCell>
                         <TableCell>
-                          <span className="font-medium">{entry.displayName}</span>
+                          <span className="font-medium text-zinc-100">{entry.displayName}</span>
                           {isSelf ? (
                             <Badge className="ml-2 border-transparent bg-emerald-600 text-[10px] text-white">
                               Vos
                             </Badge>
                           ) : null}
                         </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
+                        <TableCell className="text-right font-semibold tabular-nums text-zinc-100">
                           {entry.totalPoints}
                         </TableCell>
                         <TableCell>
                           {open ? (
-                            <ChevronUp className="text-muted-foreground size-4" />
+                            <ChevronUp className="size-4 text-zinc-500" />
                           ) : (
-                            <ChevronDown className="text-muted-foreground size-4" />
+                            <ChevronDown className="size-4 text-zinc-500" />
                           )}
                         </TableCell>
                       </TableRow>
                       {open ? (
                         <TableRow
                           key={`${entry.userId}-detail`}
-                          className="bg-muted/40 hover:bg-muted/40"
+                          className="bg-zinc-950/50 hover:bg-zinc-950/50"
                         >
                           <TableCell colSpan={5} className="p-4">
-                            <p className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
                               Desglose de puntos
                             </p>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {breakdownRows.map(({ key, label }) => (
                                 <div
                                   key={key}
-                                  className="flex justify-between gap-4 border-b border-emerald-950/5 py-1 text-sm last:border-0"
+                                  className="flex justify-between gap-4 border-b border-zinc-800/80 py-1 text-sm last:border-0"
                                 >
-                                  <span className="text-muted-foreground">{label}</span>
-                                  <span className="tabular-nums font-medium">
+                                  <span className="text-zinc-400">{label}</span>
+                                  <span className="font-medium tabular-nums text-zinc-100">
                                     {entry.breakdown[key]}
                                   </span>
                                 </div>

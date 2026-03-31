@@ -13,21 +13,20 @@ const deadlineDate = parseISO(PREDICTION_DEADLINE);
 
 const FixturePage = async () => {
   const userResult = await getCurrentUser();
-  if (!userResult.success || !userResult.data) {
-    return null;
-  }
-  const user = userResult.data;
+  const user = userResult.success ? userResult.data : null;
 
-  const predictionResult = await getUserPredictionAction();
-  const prediction = predictionResult.success ? predictionResult.data : null;
+  const predictionResult = user ? await getUserPredictionAction() : null;
+  const prediction = predictionResult?.success ? predictionResult.data : null;
 
   const deadlinePassed = Date.now() > deadlineDate.getTime();
   const isLocked = prediction?.isLocked ?? false;
-  const isPaid = user.paymentStatus === 'paid';
+  const isPaid = user?.paymentStatus === 'paid';
   const canSave = isPaid && !isLocked && !deadlinePassed;
 
   let saveDisabledReason: string | undefined;
-  if (!isPaid) {
+  if (!user) {
+    saveDisabledReason = 'Iniciá sesión para guardar tu predicción.';
+  } else if (!isPaid) {
     saveDisabledReason = 'Pagá la entrada para poder guardar tu predicción.';
   } else if (isLocked) {
     saveDisabledReason = 'Tu predicción está bloqueada.';
@@ -36,23 +35,35 @@ const FixturePage = async () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-emerald-950 sm:text-3xl">Fixture</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+    <div className="dark relative -mx-4 -my-6 min-h-screen space-y-8 overflow-hidden bg-zinc-950 px-4 py-10 text-zinc-50 sm:-mx-6 sm:-my-8 sm:px-6 sm:py-12">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_50%_at_50%_-10%,rgba(16,185,129,0.2),transparent)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-24 top-1/4 h-60 w-60 rounded-full bg-emerald-500/10 blur-3xl"
+        aria-hidden
+      />
+
+      <div className="relative mx-auto w-full max-w-5xl space-y-2">
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Fixture</h1>
+        <p className="mt-1 text-sm text-zinc-400 sm:text-base">
           Cargá marcadores y definiciones por fase. El guardado completo se habilitará en las
           próximas iteraciones.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2">
+        {!user ? (
+          <Badge className="border-zinc-700 bg-zinc-800/80 text-zinc-100">Modo invitado</Badge>
+        ) : null}
         {isLocked ? (
-          <Badge className="gap-1 border-transparent bg-zinc-700 text-white">
+          <Badge className="gap-1 border-zinc-700 bg-zinc-800/80 text-zinc-100">
             <Lock className="size-3" />
             Bloqueada
           </Badge>
         ) : (
-          <Badge className="border-emerald-600/40 bg-emerald-600/10 text-emerald-900">
+          <Badge className="border-emerald-500/30 bg-emerald-500/15 text-emerald-200">
             Editable
           </Badge>
         )}
@@ -62,17 +73,17 @@ const FixturePage = async () => {
             Cierre vencido
           </Badge>
         ) : (
-          <Badge variant="outline" className="border-emerald-600/30">
+          <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
             Límite: {format(deadlineDate, "d MMM yyyy", { locale: es })}
           </Badge>
         )}
       </div>
 
       {(deadlinePassed || isLocked) && (
-        <Card className="border-amber-500/30 bg-amber-500/5 shadow-sm">
+        <Card className="relative mx-auto w-full max-w-5xl border-amber-500/30 bg-amber-500/10 shadow-sm">
           <CardHeader className="py-3">
-            <CardTitle className="text-base text-amber-950">Importante</CardTitle>
-            <CardDescription className="text-amber-950/80">
+            <CardTitle className="text-base text-amber-200">Importante</CardTitle>
+            <CardDescription className="text-amber-100/90">
               {deadlinePassed
                 ? 'El plazo oficial de predicciones finalizó. Solo podrás ver tu planilla cuando el editor esté listo.'
                 : 'Tu planilla está bloqueada: no se aplicarán nuevos cambios.'}
@@ -81,10 +92,10 @@ const FixturePage = async () => {
         </Card>
       )}
 
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="relative mx-auto w-full max-w-5xl border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Tu planilla</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg text-white">Tu planilla</CardTitle>
+          <CardDescription className="text-zinc-400">
             {prediction
               ? `Última actualización: ${format(parseISO(prediction.updatedAt), "d MMM yyyy, HH:mm", { locale: es })}`
               : 'Aún no tenés predicciones guardadas.'}

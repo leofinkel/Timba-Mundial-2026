@@ -221,7 +221,7 @@ const DashboardPage = async () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-semibold text-emerald-900">
+            <p className="text-lg font-semibold text-emerald-800">
               Faltan{' '}
               <span className="tabular-nums">
                 {daysLeft}d {hoursLeft}h

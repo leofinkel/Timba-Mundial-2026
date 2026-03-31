@@ -107,7 +107,11 @@ const HomePage = async () => {
               Cómo se suman los puntos
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              El reglamento completo está en el brief del juego; acá va lo esencial.
+              El reglamento completo está en la página de{' '}
+              <Link href="/rules" className="text-emerald-400 underline-offset-4 hover:underline">
+                Reglas
+              </Link>
+              ; acá va lo esencial.
             </p>
             <ul className="mt-5 grid gap-3 text-left text-sm text-zinc-300 sm:grid-cols-2 sm:gap-4">
               {GAME_RULES_BRIEF_LINES.map((line) => (
