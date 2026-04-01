@@ -91,6 +91,11 @@ export const adminClassificationUpdateSchema = z.object({
   rank: z.number().int().min(1).nullable().optional(),
 });
 
+export const adminNewsPostSchema = z.object({
+  title: z.string().min(3, 'Título demasiado corto').max(200, 'Título demasiado largo'),
+  body: z.string().min(5, 'Contenido demasiado corto').max(5000, 'Contenido demasiado largo'),
+});
+
 export type LoginSchemaInferred = z.infer<typeof loginSchema>;
 export type RegisterSchemaInferred = z.infer<typeof registerSchema>;
 export type GroupMatchPredictionSchemaInferred = z.infer<typeof groupMatchPredictionSchema>;
@@ -105,3 +110,4 @@ export type AdminMatchSchemaInferred = z.infer<typeof adminMatchSchema>;
 export type AdminClassificationUpdateSchemaInferred = z.infer<
   typeof adminClassificationUpdateSchema
 >;
+export type AdminNewsPostSchemaInferred = z.infer<typeof adminNewsPostSchema>;

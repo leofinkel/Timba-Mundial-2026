@@ -42,7 +42,7 @@ export const Navbar = ({ user }: NavbarProps) => {
     : 'border-transparent bg-red-600 text-white hover:bg-red-600/90';
 
   return (
-    <header className="sticky top-0 z-50 border-b border-emerald-950/10 bg-background/90 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
+    <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <MobileNav
           user={user}
@@ -53,11 +53,8 @@ export const Navbar = ({ user }: NavbarProps) => {
 
         <Link
           href="/dashboard"
-          className="flex shrink-0 items-center gap-2 font-bold tracking-tight text-emerald-700"
+          className="flex shrink-0 items-center gap-2 font-bold tracking-tight text-white"
         >
-          <span className="bg-emerald-600/15 text-emerald-800 ring-emerald-600/20 inline-flex size-8 items-center justify-center rounded-lg text-sm ring-1">
-            ⚽
-          </span>
           <span className="hidden sm:inline">Timba Mundial 2026</span>
         </Link>
 
@@ -70,8 +67,8 @@ export const Navbar = ({ user }: NavbarProps) => {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  'font-medium',
-                  active && 'bg-emerald-600/10 text-emerald-800',
+                  'font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white',
+                  active && 'bg-zinc-800 text-white',
                 )}
                 asChild
               >
@@ -84,8 +81,8 @@ export const Navbar = ({ user }: NavbarProps) => {
               variant="ghost"
               size="sm"
               className={cn(
-                'font-medium',
-                pathname.startsWith('/admin') && 'bg-emerald-600/10 text-emerald-800',
+                'font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white',
+                pathname.startsWith('/admin') && 'bg-zinc-800 text-white',
               )}
               asChild
             >
@@ -109,12 +106,12 @@ export const Navbar = ({ user }: NavbarProps) => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative size-9 rounded-full p-0">
-                <Avatar className="size-9 border border-emerald-600/30">
+              <Button variant="ghost" className="relative size-9 rounded-full p-0 hover:bg-zinc-800">
+                <Avatar className="size-9 border border-zinc-700">
                   {user.avatarUrl ? (
                     <AvatarImage src={user.avatarUrl} alt={user.displayName} />
                   ) : null}
-                  <AvatarFallback className="bg-emerald-600/15 text-sm font-semibold text-emerald-800">
+                  <AvatarFallback className="bg-zinc-800 text-sm font-semibold text-zinc-200">
                     {user.avatarUrl ? (
                       initialsFromName(user.displayName)
                     ) : (
@@ -124,17 +121,17 @@ export const Navbar = ({ user }: NavbarProps) => {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 border-zinc-800 bg-zinc-950 text-zinc-100">
               <DropdownMenuLabel>
                 <div className="flex flex-col gap-0.5">
-                  <span>{user.displayName}</span>
-                  <span className="text-muted-foreground text-xs font-normal">
+                  <span className="text-zinc-100">{user.displayName}</span>
+                  <span className="text-zinc-400 text-xs font-normal">
                     {user.email}
                   </span>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+              <DropdownMenuSeparator className="bg-zinc-800" />
+              <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
                 <Link href="/profile" className="cursor-pointer">
                   <User className="mr-2 size-4" />
                   Mi perfil
@@ -143,9 +140,9 @@ export const Navbar = ({ user }: NavbarProps) => {
               <DropdownMenuItem className="sm:hidden" disabled>
                 <Badge className={paymentBadgeClass}>{paymentBadgeLabel}</Badge>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-zinc-800" />
               <DropdownMenuItem
-                className="text-red-600 focus:text-red-600"
+                className="text-red-500 focus:bg-zinc-800 focus:text-red-400"
                 onSelect={() => {
                   void logoutAction();
                 }}

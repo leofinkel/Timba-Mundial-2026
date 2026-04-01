@@ -85,7 +85,7 @@ export const AdminRulesTab = ({ rules }: AdminRulesTabProps) => {
 
   return (
     <div className="space-y-6">
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
           <CardTitle>Crear regla</CardTitle>
           <CardDescription>ABM de reglamento completo.</CardDescription>
@@ -166,7 +166,7 @@ interface RuleEditorCardProps {
 const RuleEditorCard = ({ rule, pending, onSave, onDelete }: RuleEditorCardProps) => {
   const [local, setLocal] = useState(rule);
   return (
-    <Card className="border-emerald-950/10 shadow-sm">
+    <Card className="border-zinc-800/80 shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Regla #{rule.sortOrder}</CardTitle>
       </CardHeader>

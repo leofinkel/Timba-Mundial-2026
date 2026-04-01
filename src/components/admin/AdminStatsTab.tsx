@@ -47,7 +47,7 @@ export const AdminStatsTab = ({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map(({ title, value, description, Icon }) => (
-        <Card key={title} className="border-emerald-950/10 shadow-md">
+        <Card key={title} className="border-zinc-800/80 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="text-emerald-600 size-4" />

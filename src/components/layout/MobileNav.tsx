@@ -41,15 +41,15 @@ export const MobileNav = ({
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="text-zinc-300 hover:bg-zinc-800 hover:text-white md:hidden"
           aria-label="Abrir menú"
         >
           <Menu className="size-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[min(100%,20rem)] border-emerald-950/10">
+      <SheetContent side="left" className="w-[min(100%,20rem)] border-zinc-800 bg-zinc-950">
         <SheetHeader>
-          <SheetTitle className="text-left font-semibold text-emerald-700">
+          <SheetTitle className="text-left font-semibold text-white">
             Timba Mundial 2026
           </SheetTitle>
         </SheetHeader>
@@ -59,10 +59,10 @@ export const MobileNav = ({
             return (
               <Button
                 key={link.href}
-                variant={active ? 'secondary' : 'ghost'}
+                variant="ghost"
                 className={cn(
-                  'justify-start font-medium',
-                  active && 'bg-emerald-600/15 text-emerald-800',
+                  'justify-start font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white',
+                  active && 'bg-zinc-800 text-white',
                 )}
                 asChild
               >
@@ -74,10 +74,10 @@ export const MobileNav = ({
           })}
           {isAdmin ? (
             <Button
-              variant={pathname.startsWith('/admin') ? 'secondary' : 'ghost'}
+              variant="ghost"
               className={cn(
-                'justify-start font-medium',
-                pathname.startsWith('/admin') && 'bg-emerald-600/15 text-emerald-800',
+                'justify-start font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white',
+                pathname.startsWith('/admin') && 'bg-zinc-800 text-white',
               )}
               asChild
             >
@@ -87,15 +87,15 @@ export const MobileNav = ({
             </Button>
           ) : null}
         </div>
-        <Separator className="my-4" />
+        <Separator className="my-4 bg-zinc-800" />
         <div className="space-y-3 text-sm">
           <div>
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">Usuario</p>
-            <p className="font-medium">{user.displayName}</p>
-            <p className="text-muted-foreground truncate text-xs">{user.email}</p>
+            <p className="text-zinc-400 text-xs uppercase tracking-wide">Usuario</p>
+            <p className="font-medium text-zinc-100">{user.displayName}</p>
+            <p className="truncate text-xs text-zinc-400">{user.email}</p>
           </div>
           <div>
-            <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">Pago</p>
+            <p className="mb-1 text-xs uppercase tracking-wide text-zinc-400">Pago</p>
             <Badge className={paymentBadgeClass}>{paymentBadgeLabel}</Badge>
           </div>
         </div>

@@ -78,7 +78,7 @@ export const AdminClassificationTab = ({ classification, users }: AdminClassific
 
   return (
     <div className="space-y-6">
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
           <CardTitle>ABM de clasificación</CardTitle>
           <CardDescription>Alta/edición manual de puntos y puesto por usuario.</CardDescription>
@@ -129,10 +129,10 @@ export const AdminClassificationTab = ({ classification, users }: AdminClassific
         </CardContent>
       </Card>
 
-      <div className="rounded-lg border border-emerald-950/10 shadow-sm">
+      <div className="rounded-lg border border-zinc-800/80 shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow className="border-emerald-950/10 hover:bg-transparent">
+            <TableRow className="border-zinc-800/80 hover:bg-transparent">
               <TableHead>Usuario</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-right">Puntos</TableHead>
@@ -149,7 +149,7 @@ export const AdminClassificationTab = ({ classification, users }: AdminClassific
               </TableRow>
             ) : (
               classification.map((entry) => (
-                <TableRow key={entry.userId} className="border-emerald-950/10">
+                <TableRow key={entry.userId} className="border-zinc-800/80">
                   <TableCell className="font-medium">{entry.displayName}</TableCell>
                   <TableCell className="text-muted-foreground">{entry.email}</TableCell>
                   <TableCell className="text-right">{entry.totalPoints}</TableCell>

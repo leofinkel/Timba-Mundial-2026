@@ -85,8 +85,8 @@ export const ProfileForm = ({ user }: ProfileFormProps) => {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-emerald-800">Mi perfil</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight text-white">Mi perfil</h1>
+        <p className="mt-1 text-sm text-zinc-400">
           Administrá tu información personal y tu foto de perfil.
         </p>
       </div>
@@ -95,26 +95,26 @@ export const ProfileForm = ({ user }: ProfileFormProps) => {
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
             message.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-red-200 bg-red-50 text-red-800'
+              ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-200'
+              : 'border-red-500/30 bg-red-500/15 text-red-200'
           }`}
         >
           {message.text}
         </div>
       )}
 
-      <Card>
+      <Card className="border-zinc-800/80 bg-zinc-900/50">
         <CardHeader>
-          <CardTitle className="text-lg">Foto de perfil</CardTitle>
+          <CardTitle className="text-lg text-white">Foto de perfil</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-6">
             <div className="relative">
-              <Avatar className="size-20 border-2 border-emerald-600/30">
+              <Avatar className="size-20 border-2 border-zinc-700">
                 {avatarUrl ? (
                   <AvatarImage src={avatarUrl} alt={displayName} />
                 ) : null}
-                <AvatarFallback className="bg-emerald-600/15 text-lg font-semibold text-emerald-800">
+                <AvatarFallback className="bg-zinc-800 text-lg font-semibold text-zinc-200">
                   {avatarUrl ? initials : <UserRound className="size-8" />}
                 </AvatarFallback>
               </Avatar>
@@ -145,7 +145,7 @@ export const ProfileForm = ({ user }: ProfileFormProps) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-red-600 hover:text-red-700"
+                  className="text-red-400 hover:text-red-300"
                   onClick={handleRemoveAvatar}
                   disabled={isUploading || isPending}
                 >
@@ -159,9 +159,9 @@ export const ProfileForm = ({ user }: ProfileFormProps) => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-zinc-800/80 bg-zinc-900/50">
         <CardHeader>
-          <CardTitle className="text-lg">Información personal</CardTitle>
+          <CardTitle className="text-lg text-white">Información personal</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

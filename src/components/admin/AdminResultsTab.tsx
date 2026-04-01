@@ -105,7 +105,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
 
   return (
     <div className="space-y-8">
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
           <CardTitle>Resultados de partido</CardTitle>
           <CardDescription>
@@ -168,7 +168,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
         </CardContent>
       </Card>
 
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
           <CardTitle>Resultados especiales</CardTitle>
           <CardDescription>Honor board del torneo (campeón, figuras, etc.)</CardDescription>

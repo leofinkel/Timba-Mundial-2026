@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
+import { NewsList } from '@/components/news/NewsList';
 import { GAME_RULES_BRIEF_LINES } from '@/constants/gameRulesBrief';
 import { PUBLIC_NAV_LINKS } from '@/constants/navigation';
+import { listPublicNews } from '@/services/newsService';
 
 const HomePage = async () => {
   const supabase = await createServerClient();
@@ -14,6 +16,8 @@ const HomePage = async () => {
   if (user) {
     redirect('/dashboard');
   }
+
+  const news = await listPublicNews(5);
 
   return (
     <div className="dark min-h-screen bg-zinc-950 text-zinc-50">
@@ -77,8 +81,7 @@ const HomePage = async () => {
               Timba Mundial 2026
             </h1>
             <p className="mt-4 max-w-xl text-pretty text-base text-zinc-400 sm:text-lg">
-              Predecí resultados, competí con tu grupo y seguí el ranking en vivo. Simple, mobile-first
-              y pensado para el mundial de 48 equipos.
+              Volvimos recargados
             </p>
             <div className="mt-8 flex w-full max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
               <Button
@@ -98,6 +101,8 @@ const HomePage = async () => {
               </Button>
             </div>
           </section>
+
+          <NewsList news={news} />
 
           <section
             className="mt-16 rounded-2xl border border-emerald-500/15 bg-zinc-900/50 p-6 backdrop-blur-sm sm:mt-20 sm:p-8"

@@ -199,6 +199,20 @@ CREATE TABLE public.real_results (
 
 COMMENT ON TABLE public.real_results IS 'Canonical FIFA-style special results (champion, awards); used to score specials and finals.';
 
+-- -----------------------------------------------------------------------------
+-- news_posts: admin-published announcements shown on the landing/dashboard.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.news_posts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  author_id UUID NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.news_posts IS 'Admin-authored news items displayed on home and dashboard pages.';
+
 -- =============================================================================
 -- SECTION: Indexes (frequent filters, joins, leaderboard)
 -- =============================================================================
@@ -228,6 +242,8 @@ CREATE INDEX idx_prediction_specials_prediction_id ON public.prediction_specials
 
 CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_points DESC NULLS LAST);
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
+
+CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
 
 -- =============================================================================
 -- SECTION: updated_at trigger
@@ -267,6 +283,11 @@ CREATE TRIGGER trg_user_scores_updated_at
 
 CREATE TRIGGER trg_real_results_updated_at
   BEFORE UPDATE ON public.real_results
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_updated_at();
+
+CREATE TRIGGER trg_news_posts_updated_at
+  BEFORE UPDATE ON public.news_posts
   FOR EACH ROW
   EXECUTE FUNCTION public.set_updated_at();
 
@@ -508,6 +529,23 @@ CREATE POLICY "real_results_select_authenticated"
 
 CREATE POLICY "real_results_write_admin"
   ON public.real_results
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- -----------------------------------------------------------------------------
+-- news_posts: anyone can read (including anon for landing page); admins maintain
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.news_posts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "news_posts_select_public"
+  ON public.news_posts
+  FOR SELECT
+  USING (true);
+
+CREATE POLICY "news_posts_write_admin"
+  ON public.news_posts
   FOR ALL
   TO authenticated
   USING (public.is_admin())

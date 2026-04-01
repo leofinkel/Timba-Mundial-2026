@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminClassificationTab } from '@/components/admin/AdminClassificationTab';
 import { AdminFixtureTab } from '@/components/admin/AdminFixtureTab';
+import { AdminNewsTab } from '@/components/admin/AdminNewsTab';
 import { AdminPaymentsTab } from '@/components/admin/AdminPaymentsTab';
 import { AdminResultsTab } from '@/components/admin/AdminResultsTab';
 import { AdminRulesTab } from '@/components/admin/AdminRulesTab';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 import type { MatchRow } from '@/repositories/matchRepository';
 import type { AdminClassificationEntry, AdminGameRule } from '@/types/admin';
 import type { UserProfile } from '@/types/auth';
+import type { NewsPost } from '@/types/news';
 import { ChevronDown } from 'lucide-react';
 
 interface MatchOption {
@@ -48,6 +50,7 @@ interface AdminDashboardPanelProps {
   rules: AdminGameRule[];
   matches: MatchRow[];
   classification: AdminClassificationEntry[];
+  news: NewsPost[];
 }
 
 export const AdminDashboardPanel = ({
@@ -58,6 +61,7 @@ export const AdminDashboardPanel = ({
   rules,
   matches,
   classification,
+  news,
 }: AdminDashboardPanelProps) => {
   const [activeTab, setActiveTab] = useState('payments');
   const isAbmSelected =
@@ -65,7 +69,7 @@ export const AdminDashboardPanel = ({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 border border-zinc-800/80 bg-zinc-900/50 p-2 sm:grid-cols-4">
+      <TabsList className="grid h-auto w-full grid-cols-1 gap-2 border border-zinc-800/80 bg-zinc-900/50 p-2 sm:grid-cols-5">
         <TabsTrigger
           value="payments"
           className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
@@ -113,6 +117,12 @@ export const AdminDashboardPanel = ({
           </DropdownMenuContent>
         </DropdownMenu>
         <TabsTrigger
+          value="news"
+          className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
+        >
+          Noticias
+        </TabsTrigger>
+        <TabsTrigger
           value="stats"
           className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
         >
@@ -133,6 +143,9 @@ export const AdminDashboardPanel = ({
       </TabsContent>
       <TabsContent value="classification" className="mt-6">
         <AdminClassificationTab classification={classification} users={users} />
+      </TabsContent>
+      <TabsContent value="news" className="mt-6">
+        <AdminNewsTab news={news} />
       </TabsContent>
       <TabsContent value="stats" className="mt-6">
         <AdminStatsTab

@@ -98,7 +98,7 @@ export const AdminFixtureTab = ({ matches, teams }: AdminFixtureTabProps) => {
 
   return (
     <div className="space-y-6">
-      <Card className="border-emerald-950/10 shadow-md">
+      <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
           <CardTitle>Alta de partido</CardTitle>
           <CardDescription>ABM del fixture: crear, editar y eliminar cruces.</CardDescription>
@@ -176,7 +176,7 @@ const MatchEditorCard = ({ match, teams, pending }: MatchEditorCardProps) => {
   };
 
   return (
-    <Card className="border-emerald-950/10 shadow-sm">
+    <Card className="border-zinc-800/80 shadow-sm">
       <CardHeader>
         <CardTitle className="text-base">Partido #{match.match_number}</CardTitle>
       </CardHeader>

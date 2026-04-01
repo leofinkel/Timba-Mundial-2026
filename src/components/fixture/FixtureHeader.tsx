@@ -84,13 +84,13 @@ export const FixtureHeader = ({
             </time>
           </p>
           <p
-            className="text-sm tabular-nums text-emerald-800 dark:text-emerald-300"
+            className="text-sm tabular-nums text-emerald-300"
             aria-live="polite"
           >
             {formatRemaining(remainingMs)}
           </p>
           {isLocked && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
               <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 {lockWarning ??

@@ -9,6 +9,7 @@ import {
   listClassificationForAdmin,
   listGameRulesForAdmin,
 } from '@/services/adminService';
+import { listPublicNews } from '@/services/newsService';
 
 const AdminPage = async () => {
   const userResult = await getCurrentUser();
@@ -19,12 +20,13 @@ const AdminPage = async () => {
     redirect('/dashboard');
   }
 
-  const [usersRes, statsRes, matches, rules, classification] = await Promise.all([
+  const [usersRes, statsRes, matches, rules, classification, news] = await Promise.all([
     getAllUsersAction(),
     getAdminDashboardAction(),
     listAllMatchesForAdmin(),
     listGameRulesForAdmin(),
     listClassificationForAdmin(),
+    listPublicNews(),
   ]);
 
   if (!usersRes.success || !usersRes.data) {
@@ -52,10 +54,10 @@ const AdminPage = async () => {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-emerald-950 sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           Panel admin
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+        <p className="mt-1 text-sm text-zinc-400 sm:text-base">
           Pagos y ABM de reglamento, fixture y clasificación.
         </p>
       </div>
@@ -68,6 +70,7 @@ const AdminPage = async () => {
         rules={rules}
         matches={matches}
         classification={classification}
+        news={news}
       />
     </div>
   );

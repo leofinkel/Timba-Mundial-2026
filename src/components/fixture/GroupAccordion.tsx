@@ -57,7 +57,7 @@ export const GroupAccordion = ({
               <span className="text-base font-semibold tracking-tight">{group.name}</span>
               <Badge
                 variant="secondary"
-                className="bg-emerald-600/15 text-emerald-800 dark:text-emerald-200"
+                className="bg-emerald-600/15 text-emerald-200"
               >
                 {completed}/{total} partidos
               </Badge>

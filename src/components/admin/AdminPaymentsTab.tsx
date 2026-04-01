@@ -46,10 +46,10 @@ const PaymentToggle = ({ user }: { user: UserProfile }) => {
 
 export const AdminPaymentsTab = ({ users }: AdminPaymentsTabProps) => {
   return (
-    <div className="rounded-lg border border-emerald-950/10 shadow-sm">
+    <div className="rounded-lg border border-zinc-800/80 shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow className="border-emerald-950/10 hover:bg-transparent">
+          <TableRow className="border-zinc-800/80 hover:bg-transparent">
             <TableHead>Jugador</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Rol</TableHead>
@@ -59,7 +59,7 @@ export const AdminPaymentsTab = ({ users }: AdminPaymentsTabProps) => {
         </TableHeader>
         <TableBody>
           {users.map((u) => (
-            <TableRow key={u.id} className="border-emerald-950/10">
+            <TableRow key={u.id} className="border-zinc-800/80">
               <TableCell className="font-medium">{u.displayName}</TableCell>
               <TableCell className="text-muted-foreground max-w-[200px] truncate">
                 {u.email}

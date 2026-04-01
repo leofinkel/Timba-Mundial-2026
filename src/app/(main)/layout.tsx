@@ -26,13 +26,7 @@ const MainLayout = async ({ children }: { children: React.ReactNode }) => {
 
   return (
     <MainUserProvider user={user}>
-      <div
-        className={
-          user
-            ? 'min-h-screen bg-gradient-to-b from-emerald-50/80 via-background to-background'
-            : 'dark min-h-screen bg-zinc-950 text-zinc-50'
-        }
-      >
+      <div className="dark min-h-screen bg-zinc-950 text-zinc-50">
         {user ? (
           <Navbar user={user} />
         ) : (
