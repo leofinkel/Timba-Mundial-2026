@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { listPublicNews } from '@/services/newsService';
+import { formatARS } from '@/lib/utils';
 import { getPrizePool, getUserRank } from '@/services/rankingService';
 import type { PredictionStatus } from '@/types/prediction';
 
@@ -200,16 +201,16 @@ const DashboardPage = async () => {
         <CardContent className="grid gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs uppercase text-zinc-400">Pozo total</p>
-            <p className="text-2xl font-bold text-emerald-300">{prizePool.totalPool}</p>
-            <p className="text-xs text-zinc-400">unidades × jugadores al día</p>
+            <p className="text-2xl font-bold text-emerald-300">{formatARS(prizePool.totalPool)}</p>
+            <p className="text-xs text-zinc-400">{prizePool.paidUsersCount} jugadores habilitados</p>
           </div>
           <div>
             <p className="text-xs uppercase text-zinc-400">1.er premio</p>
-            <p className="text-xl font-semibold text-white">{prizePool.firstPrize}</p>
+            <p className="text-xl font-semibold text-white">{formatARS(prizePool.firstPrize)}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-zinc-400">Jugadores habilitados</p>
-            <p className="text-xl font-semibold text-white">{prizePool.paidUsersCount}</p>
+            <p className="text-xs uppercase text-zinc-400">2.º premio</p>
+            <p className="text-xl font-semibold text-white">{formatARS(prizePool.secondPrize)}</p>
           </div>
         </CardContent>
       </Card>

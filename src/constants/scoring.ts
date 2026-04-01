@@ -26,6 +26,9 @@ export const SCORING_RULES = {
   },
 } as const satisfies ScoringRules;
 
+/** Valor de inscripción por jugador (ARS). */
+export const ENTRY_FEE = 20_000;
+
 export const PRIZE_DISTRIBUTION = {
   first: 0.7,
   second: 0.2,

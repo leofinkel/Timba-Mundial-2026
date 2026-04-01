@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { PRIZE_DISTRIBUTION } from '@/constants/scoring';
+import { ENTRY_FEE, PRIZE_DISTRIBUTION } from '@/constants/scoring';
 import { createServiceLogger } from '@/lib/logger';
 import { createAdminClient } from '@/lib/supabase/admin';
 import * as profileRepository from '@/repositories/profileRepository';
@@ -9,14 +9,11 @@ import type { Leaderboard, PrizePool, RankingEntry } from '@/types/ranking';
 
 const log = createServiceLogger('rankingService');
 
-/** One abstract unit per paid user when no fixed entry fee exists in constants. */
-const POOL_UNIT_PER_PAID_USER = 1;
-
 export const getPrizePool = async (): Promise<PrizePool> => {
   try {
     const supabase = createAdminClient();
     const paidUsersCount = await profileRepository.countPaidProfiles(supabase);
-    const totalPool = paidUsersCount * POOL_UNIT_PER_PAID_USER;
+    const totalPool = paidUsersCount * ENTRY_FEE;
     const prizePool: PrizePool = {
       totalPool,
       firstPrize: totalPool * PRIZE_DISTRIBUTION.first,

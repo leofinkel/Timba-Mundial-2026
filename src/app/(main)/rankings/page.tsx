@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/actions/auth';
 import { RankingsLeaderboard } from '@/components/rankings/RankingsLeaderboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PRIZE_DISTRIBUTION } from '@/constants/scoring';
+import { formatARS } from '@/lib/utils';
 import { getLeaderboard } from '@/services/rankingService';
 
 const RankingsPage = async () => {
@@ -48,19 +49,20 @@ const RankingsPage = async () => {
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4 shadow-sm">
             <p className="text-xs font-medium uppercase text-zinc-400">Pozo total</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-300">{prizePool.totalPool}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-300">{formatARS(prizePool.totalPool)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{prizePool.paidUsersCount} jugadores</p>
           </div>
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4 shadow-sm">
             <p className="text-xs font-medium uppercase text-zinc-400">1.er premio (70%)</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-300">{prizePool.firstPrize}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-300">{formatARS(prizePool.firstPrize)}</p>
           </div>
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4 shadow-sm">
             <p className="text-xs font-medium uppercase text-zinc-400">2.º premio (20%)</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-300">{prizePool.secondPrize}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-300">{formatARS(prizePool.secondPrize)}</p>
           </div>
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4 shadow-sm">
             <p className="text-xs font-medium uppercase text-zinc-400">3.er premio (10%)</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-300">{prizePool.thirdPrize}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-300">{formatARS(prizePool.thirdPrize)}</p>
           </div>
         </CardContent>
       </Card>
