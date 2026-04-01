@@ -6,7 +6,12 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies: users can manage their own avatar folder
+-- Storage policies: users can manage their own avatar folder (re-runnable)
+DROP POLICY IF EXISTS "avatars_select_public" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_insert_own" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_update_own" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_delete_own" ON storage.objects;
+
 CREATE POLICY "avatars_select_public"
   ON storage.objects
   FOR SELECT

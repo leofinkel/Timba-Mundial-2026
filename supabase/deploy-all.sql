@@ -34,6 +34,11 @@ DROP FUNCTION IF EXISTS public.is_admin();
 DROP FUNCTION IF EXISTS public.handle_new_user();
 DROP FUNCTION IF EXISTS public.set_updated_at();
 
+DROP POLICY IF EXISTS "avatars_select_public" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_insert_own" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_update_own" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_delete_own" ON storage.objects;
+
 -- #####################################################################
 -- STEP 2: SCHEMA (tables, indexes, triggers, RLS)
 -- #####################################################################
@@ -285,6 +290,44 @@ CREATE POLICY "real_results_write_admin" ON public.real_results FOR ALL TO authe
 
 CREATE POLICY "news_posts_select_public" ON public.news_posts FOR SELECT USING (true);
 CREATE POLICY "news_posts_write_admin" ON public.news_posts FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- Storage: profile avatars (public read; each user writes only under {user_id}/)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "avatars_select_public"
+  ON storage.objects
+  FOR SELECT
+  TO public
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "avatars_insert_own"
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_update_own"
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_delete_own"
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- #####################################################################
 -- STEP 3: SEED DATA (teams, matches, game rules)
