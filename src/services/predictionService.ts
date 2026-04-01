@@ -1,17 +1,19 @@
 import 'server-only';
 
-import { PREDICTION_DEADLINE } from '@/constants/tournament';
+import { isViewOthersPredictionsWindowOpen, PREDICTION_DEADLINE } from '@/constants/tournament';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
 import * as profileRepository from '@/repositories/profileRepository';
 import type {
+  GetOtherUserPredictionForViewerResult,
   GroupMatchPrediction,
   KnockoutMatchPrediction,
   PredictionStatus,
   SavePredictionsPayload,
   SavePredictionsResult,
   UserPrediction,
+  UserPredictionView,
 } from '@/types/prediction';
 import type { GroupName } from '@/types/tournament';
 
@@ -42,6 +44,13 @@ const buildStandingsMap = (
   }
   return result;
 };
+
+const toUserPredictionView = (p: UserPrediction): UserPredictionView => ({
+  ...p,
+  predictedGroupStandings: Object.fromEntries(
+    p.predictedGroupStandings,
+  ) as UserPredictionView['predictedGroupStandings'],
+});
 
 const mapRowsToUserPrediction = async (
   supabase: SupabaseServer,
@@ -121,6 +130,76 @@ export const getUserPrediction = async (
     const message = err instanceof Error ? err.message : 'Unknown error';
     log.error({ userId, err: message }, 'getUserPrediction failed');
     throw new Error(`getUserPrediction failed: ${message}`);
+  }
+};
+
+export const getOtherUserPredictionForViewer = async (
+  viewerUserId: string,
+  targetUserId: string,
+): Promise<GetOtherUserPredictionForViewerResult> => {
+  try {
+    if (viewerUserId === targetUserId) {
+      return {
+        ok: false,
+        code: 'same_user',
+        message: 'Usá la página Fixture para ver tu propia planilla.',
+      };
+    }
+
+    const supabase = await createServerClient();
+    const paid = await profileRepository.isPaymentPaid(supabase, viewerUserId);
+    if (!paid) {
+      log.warn({ viewerUserId }, 'getOtherUserPredictionForViewer: viewer not paid');
+      return {
+        ok: false,
+        code: 'not_paid',
+        message: 'Solo los jugadores con entrada paga pueden ver pronósticos de otros.',
+      };
+    }
+
+    if (!isViewOthersPredictionsWindowOpen()) {
+      return {
+        ok: false,
+        code: 'too_early',
+        message:
+          'Podrás ver los pronósticos de otros jugadores a partir del 26 de mayo de 2026.',
+      };
+    }
+
+    const raw = await getUserPrediction(targetUserId);
+    const prediction = raw ? toUserPredictionView(raw) : null;
+    log.debug(
+      { viewerUserId, targetUserId, hasPrediction: !!prediction },
+      'getOtherUserPredictionForViewer',
+    );
+    return { ok: true, prediction };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error(
+      { viewerUserId, targetUserId, err: message },
+      'getOtherUserPredictionForViewer failed',
+    );
+    throw new Error(`getOtherUserPredictionForViewer failed: ${message}`);
+  }
+};
+
+export const getUserPredictionForAdmin = async (
+  adminUserId: string,
+  targetUserId: string,
+): Promise<UserPredictionView | null> => {
+  try {
+    const supabase = await createServerClient();
+    const isAdmin = await profileRepository.hasAdminRole(supabase, adminUserId);
+    if (!isAdmin) {
+      log.warn({ adminUserId }, 'getUserPredictionForAdmin: not admin');
+      throw new Error('Forbidden');
+    }
+    const raw = await getUserPrediction(targetUserId);
+    return raw ? toUserPredictionView(raw) : null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ adminUserId, targetUserId, err: message }, 'getUserPredictionForAdmin failed');
+    throw err instanceof Error ? err : new Error('getUserPredictionForAdmin failed');
   }
 };
 

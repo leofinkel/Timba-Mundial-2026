@@ -46,3 +46,13 @@ export interface AdminClassificationUpdateInput {
   totalPoints: number;
   rank?: number | null;
 }
+
+/** Usuarios con al menos un guardado de planilla (submitted_at definido). */
+export interface AdminSubmittedPredictionUser {
+  userId: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  submittedAt: string;
+  updatedAt: string;
+}

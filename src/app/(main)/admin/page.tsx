@@ -8,7 +8,9 @@ import {
   listAllMatchesForAdmin,
   listClassificationForAdmin,
   listGameRulesForAdmin,
+  listSubmittedPredictionsForAdmin,
 } from '@/services/adminService';
+import { getTournament } from '@/services/fixtureService';
 import { listPublicNews } from '@/services/newsService';
 
 const AdminPage = async () => {
@@ -20,14 +22,17 @@ const AdminPage = async () => {
     redirect('/dashboard');
   }
 
-  const [usersRes, statsRes, matches, rules, classification, news] = await Promise.all([
-    getAllUsersAction(),
-    getAdminDashboardAction(),
-    listAllMatchesForAdmin(),
-    listGameRulesForAdmin(),
-    listClassificationForAdmin(),
-    listPublicNews(),
-  ]);
+  const [usersRes, statsRes, matches, rules, classification, submittedPredictionUsers, tournament, news] =
+    await Promise.all([
+      getAllUsersAction(),
+      getAdminDashboardAction(),
+      listAllMatchesForAdmin(),
+      listGameRulesForAdmin(),
+      listClassificationForAdmin(),
+      listSubmittedPredictionsForAdmin(),
+      getTournament(),
+      listPublicNews(),
+    ]);
 
   if (!usersRes.success || !usersRes.data) {
     redirect('/dashboard');
@@ -74,6 +79,8 @@ const AdminPage = async () => {
         rules={rules}
         matches={matches}
         classification={classification}
+        submittedPredictionUsers={submittedPredictionUsers}
+        tournament={tournament}
         news={news}
       />
     </div>

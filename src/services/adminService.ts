@@ -14,6 +14,7 @@ import type {
   AdminGameRule,
   AdminMatchInput,
   AdminMatchUpdateInput,
+  AdminSubmittedPredictionUser,
 } from '@/types/admin';
 import type { PaymentStatus, UserProfile } from '@/types/auth';
 
@@ -88,6 +89,23 @@ export const listAllMatchesForAdmin = async (): Promise<MatchRow[]> => {
     const message = err instanceof Error ? err.message : 'Unknown error';
     log.error({ err: message }, 'listAllMatchesForAdmin failed');
     throw new Error(`listAllMatchesForAdmin failed: ${message}`);
+  }
+};
+
+export const listSubmittedPredictionsForAdmin = async (): Promise<
+  AdminSubmittedPredictionUser[]
+> => {
+  try {
+    const supabase = await createServerClient();
+    const rows = await predictionRepository.listSubmittedPredictionsWithProfilesForAdmin(
+      supabase,
+    );
+    log.debug({ count: rows.length }, 'listSubmittedPredictionsForAdmin');
+    return rows;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ err: message }, 'listSubmittedPredictionsForAdmin failed');
+    throw new Error(`listSubmittedPredictionsForAdmin failed: ${message}`);
   }
 };
 

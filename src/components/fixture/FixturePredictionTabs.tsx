@@ -135,7 +135,7 @@ export const FixturePredictionTabs = ({
           <p className="text-sm text-zinc-400">
             {saveDisabled && saveDisabledReason
               ? saveDisabledReason
-              : 'Guardá cuando termines de cargar el fixture.'}
+              : 'Podés guardar en cualquier momento; no hace falta tener todo el fixture, goleador ni figura completos.'}
           </p>
           <Button
             type="button"

@@ -1,17 +1,29 @@
-import { Trophy } from 'lucide-react';
+import { Info, Trophy } from 'lucide-react';
 
 import { getCurrentUser } from '@/actions/auth';
 import { RankingsLeaderboard } from '@/components/rankings/RankingsLeaderboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  RANKING_APPEAR_WHEN_SAVED_NOTICE,
+  RANKING_OTHERS_PREDICTIONS_NOTICE,
+} from '@/constants/rankings';
 import { PRIZE_DISTRIBUTION } from '@/constants/scoring';
+import { isViewOthersPredictionsWindowOpen } from '@/constants/tournament';
 import { formatARS } from '@/lib/utils';
+import { getTournament } from '@/services/fixtureService';
 import { getLeaderboard } from '@/services/rankingService';
 
 const RankingsPage = async () => {
-  const userResult = await getCurrentUser();
-  const user = userResult.success ? userResult.data : null;
+  const [userResult, leaderboard, tournament] = await Promise.all([
+    getCurrentUser(),
+    getLeaderboard(),
+    getTournament(),
+  ]);
 
-  const leaderboard = await getLeaderboard();
+  const user = userResult.success ? userResult.data : null;
+  const viewerPaid = user?.paymentStatus === 'paid';
+  const canViewOthersPredictions = isViewOthersPredictionsWindowOpen();
+
   const { prizePool } = leaderboard;
 
   return (
@@ -33,6 +45,19 @@ const RankingsPage = async () => {
           Ranking en vivo y reparto del pozo entre los tres primeros.
         </p>
       </div>
+
+      <Card className="relative mx-auto w-full max-w-5xl border-emerald-500/25 bg-emerald-500/5 shadow-sm backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base text-emerald-100">
+            <Info className="size-5 shrink-0 text-emerald-400" aria-hidden />
+            Información
+          </CardTitle>
+          <CardDescription className="space-y-2 text-left text-zinc-300">
+            <p>{RANKING_APPEAR_WHEN_SAVED_NOTICE}</p>
+            <p>{RANKING_OTHERS_PREDICTIONS_NOTICE}</p>
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <Card className="relative mx-auto w-full max-w-5xl overflow-hidden border-zinc-800/80 bg-gradient-to-br from-emerald-500/15 via-zinc-900/70 to-zinc-950 shadow-md backdrop-blur-sm">
         <CardHeader>
@@ -67,7 +92,13 @@ const RankingsPage = async () => {
         </CardContent>
       </Card>
 
-      <RankingsLeaderboard leaderboard={leaderboard} currentUserId={user?.id ?? ''} />
+      <RankingsLeaderboard
+        leaderboard={leaderboard}
+        currentUserId={user?.id ?? ''}
+        tournament={tournament}
+        viewerPaid={viewerPaid}
+        canViewOthersPredictions={canViewOthersPredictions}
+      />
     </div>
   );
 };

@@ -4,6 +4,8 @@ export interface RankingEntry {
   rank: number;
   userId: string;
   displayName: string;
+  /** Public URL from storage; null if no avatar. */
+  avatarUrl: string | null;
   totalPoints: number;
   previousRank: number | null;
   movement: 'up' | 'down' | 'same' | 'new';

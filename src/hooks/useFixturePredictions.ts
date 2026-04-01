@@ -356,10 +356,6 @@ export const useFixturePredictions = ({
   const save = useCallback(async () => {
     const top = specialPredictions.topScorer.trim();
     const best = specialPredictions.bestPlayer.trim();
-    if (top.length < 2 || best.length < 2) {
-      setErrors('El goleador y la figura del Mundial deben tener al menos 2 caracteres.');
-      return;
-    }
 
     setIsSaving(true);
     setErrors(null);
@@ -375,15 +371,18 @@ export const useFixturePredictions = ({
         }),
       );
 
-      const knockoutPredictionsPayload = tournament.knockoutMatches
-        .map((m) => knockoutPredictions[m.id])
-        .filter(
-          (p): p is KnockoutMatchPrediction =>
-            !!p &&
-            p.homeTeamId.length > 0 &&
-            p.awayTeamId.length > 0 &&
-            p.winnerId.length > 0,
-        );
+      const knockoutPredictionsPayload: KnockoutMatchPrediction[] =
+        tournament.knockoutMatches.map((m) => {
+          const p = knockoutPredictions[m.id];
+          return {
+            matchId: m.id,
+            homeTeamId: p?.homeTeamId ?? '',
+            awayTeamId: p?.awayTeamId ?? '',
+            homeGoals: p?.homeGoals ?? 0,
+            awayGoals: p?.awayGoals ?? 0,
+            winnerId: p?.winnerId ?? '',
+          };
+        });
 
       const result = await savePredictionsAction({
         groupPredictions: groupPredictionsPayload,

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminClassificationTab } from '@/components/admin/AdminClassificationTab';
+import { AdminSubmittedPredictionsTab } from '@/components/admin/AdminSubmittedPredictionsTab';
 import { AdminFixtureTab } from '@/components/admin/AdminFixtureTab';
 import { AdminNewsTab } from '@/components/admin/AdminNewsTab';
 import { AdminPaymentsTab } from '@/components/admin/AdminPaymentsTab';
@@ -18,9 +19,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import type { MatchRow } from '@/repositories/matchRepository';
-import type { AdminClassificationEntry, AdminGameRule } from '@/types/admin';
+import type { AdminClassificationEntry, AdminGameRule, AdminSubmittedPredictionUser } from '@/types/admin';
 import type { UserProfile } from '@/types/auth';
 import type { NewsPost } from '@/types/news';
+import type { Tournament } from '@/types/tournament';
 import { ChevronDown } from 'lucide-react';
 
 interface MatchOption {
@@ -54,6 +56,8 @@ interface AdminDashboardPanelProps {
   rules: AdminGameRule[];
   matches: MatchRow[];
   classification: AdminClassificationEntry[];
+  submittedPredictionUsers: AdminSubmittedPredictionUser[];
+  tournament: Tournament;
   news: NewsPost[];
 }
 
@@ -65,11 +69,16 @@ export const AdminDashboardPanel = ({
   rules,
   matches,
   classification,
+  submittedPredictionUsers,
+  tournament,
   news,
 }: AdminDashboardPanelProps) => {
   const [activeTab, setActiveTab] = useState('payments');
   const isAbmSelected =
-    activeTab === 'rules' || activeTab === 'fixture' || activeTab === 'classification';
+    activeTab === 'rules' ||
+    activeTab === 'fixture' ||
+    activeTab === 'classification' ||
+    activeTab === 'planillas';
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -118,6 +127,12 @@ export const AdminDashboardPanel = ({
             >
               Clasificación
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="focus:bg-zinc-800 focus:text-white"
+              onSelect={() => setActiveTab('planillas')}
+            >
+              Planillas (pronósticos)
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <TabsTrigger
@@ -147,6 +162,9 @@ export const AdminDashboardPanel = ({
       </TabsContent>
       <TabsContent value="classification" className="mt-6">
         <AdminClassificationTab classification={classification} users={users} />
+      </TabsContent>
+      <TabsContent value="planillas" className="mt-6">
+        <AdminSubmittedPredictionsTab users={submittedPredictionUsers} tournament={tournament} />
       </TabsContent>
       <TabsContent value="news" className="mt-6">
         <AdminNewsTab news={news} />

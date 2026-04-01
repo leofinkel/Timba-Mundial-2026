@@ -26,26 +26,32 @@ export const groupMatchPredictionSchema = z.object({
 
 export const knockoutMatchPredictionSchema = z.object({
   matchId: z.string().min(1),
-  homeTeamId: z.string().min(1),
-  awayTeamId: z.string().min(1),
+  homeTeamId: z.string(),
+  awayTeamId: z.string(),
   homeGoals: z.number().int().min(0).max(99),
   awayGoals: z.number().int().min(0).max(99),
-  winnerId: z.string().min(1),
+  winnerId: z.string(),
 });
+
+const specialPredictionNameSchema = z
+  .string()
+  .max(200, 'Máximo 200 caracteres');
 
 export const savePredictionsSchema = z.object({
   groupPredictions: z.array(groupMatchPredictionSchema),
   knockoutPredictions: z.array(knockoutMatchPredictionSchema).optional(),
   specialPredictions: z.object({
-    topScorer: z.string().min(2),
-    bestPlayer: z.string().min(2),
+    topScorer: specialPredictionNameSchema,
+    bestPlayer: specialPredictionNameSchema,
   }),
 });
 
 export const saveSpecialPredictionsSchema = z.object({
-  topScorer: z.string().min(2, 'El goleador debe tener al menos 2 caracteres'),
-  bestPlayer: z.string().min(2, 'La figura debe tener al menos 2 caracteres'),
+  topScorer: specialPredictionNameSchema,
+  bestPlayer: specialPredictionNameSchema,
 });
+
+export const targetUserIdSchema = z.string().uuid('Usuario inválido');
 
 export const saveSpecialResultsSchema = z.object({
   championTeamId: z.string().min(1),

@@ -32,6 +32,17 @@ export interface UserPrediction {
   updatedAt: string;
 }
 
+/** Forma serializable para el cliente (p. ej. server actions); Map no se serializa bien. */
+export type UserPredictionView = Omit<UserPrediction, 'predictedGroupStandings'> & {
+  predictedGroupStandings: Partial<Record<GroupName, string[]>>;
+};
+
+export type GetOtherUserPredictionForViewerErrorCode = 'not_paid' | 'too_early' | 'same_user';
+
+export type GetOtherUserPredictionForViewerResult =
+  | { ok: true; prediction: UserPredictionView | null }
+  | { ok: false; code: GetOtherUserPredictionForViewerErrorCode; message: string };
+
 export type PredictionStatus = 'draft' | 'submitted' | 'locked';
 
 /** Payload for persisting a user's full prediction sheet (service layer). */

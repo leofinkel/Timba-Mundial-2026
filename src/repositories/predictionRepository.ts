@@ -93,6 +93,65 @@ export const listPredictionUserIds = async (
   return (data as { user_id: string }[]).map((r) => r.user_id);
 };
 
+export const listSubmittedPredictionUserIds = async (
+  supabase: SupabaseClient,
+): Promise<string[]> => {
+  const { data, error } = await supabase.rpc('list_submitted_prediction_user_ids');
+
+  if (error) {
+    throw new Error(`list_submitted_prediction_user_ids rpc failed: ${error.message}`);
+  }
+  return ((data ?? []) as { user_id: string }[]).map((r) => r.user_id);
+};
+
+type ProfileSnippet = {
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
+};
+
+type SubmittedPredictionProfileRow = {
+  user_id: string;
+  submitted_at: string;
+  updated_at: string;
+  profiles: ProfileSnippet | ProfileSnippet[] | null;
+};
+
+export const listSubmittedPredictionsWithProfilesForAdmin = async (
+  supabase: SupabaseClient,
+): Promise<
+  Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string | null;
+    submittedAt: string;
+    updatedAt: string;
+  }>
+> => {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('user_id, submitted_at, updated_at, profiles(display_name, email, avatar_url)')
+    .not('submitted_at', 'is', null)
+    .order('submitted_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`predictions.select submitted for admin failed: ${error.message}`);
+  }
+
+  return ((data ?? []) as SubmittedPredictionProfileRow[]).map((row) => {
+    const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return {
+      userId: row.user_id,
+      displayName: prof?.display_name ?? '—',
+      email: prof?.email ?? '—',
+      avatarUrl: prof?.avatar_url ?? null,
+      submittedAt: row.submitted_at,
+      updatedAt: row.updated_at,
+    };
+  });
+};
+
 export const countPredictionsSubmitted = async (
   supabase: SupabaseClient,
 ): Promise<number> => {

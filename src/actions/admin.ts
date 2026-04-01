@@ -8,6 +8,7 @@ import {
   adminGameRuleSchema,
   adminMatchSchema,
   paymentStatusUpdateSchema,
+  targetUserIdSchema,
 } from '@/lib/validation/schemas';
 import {
   createGameRuleWithAuth,
@@ -26,6 +27,8 @@ import {
   updatePaymentStatus,
   upsertClassificationWithAuth,
 } from '@/services/adminService';
+import { getUserPredictionForAdmin } from '@/services/predictionService';
+import type { UserPredictionView } from '@/types/prediction';
 import type {
   AdminClassificationEntry,
   AdminClassificationUpdateInput,
@@ -403,6 +406,37 @@ export const upsertClassificationAdminAction = async (
     return { success: true, data: null };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const getAdminUserPredictionAction = async (
+  targetUserId: string,
+): Promise<
+  { success: true; data: UserPredictionView | null } | { success: false; error: string }
+> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    const data = await getUserPredictionForAdmin(user.id, parsed.data);
+    return { success: true, data };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    if (message === 'Forbidden') {
+      return { success: false, error: 'Forbidden' };
+    }
     return { success: false, error: message };
   }
 };

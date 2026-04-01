@@ -132,6 +132,23 @@ export const listDisplayNames = async (
   }));
 };
 
+export const listProfilesForPublicLeaderboard = async (
+  supabase: SupabaseClient,
+): Promise<{ id: string; displayName: string; avatarUrl: string | null }[]> => {
+  const { data, error } = await supabase.rpc('list_profiles_for_public_leaderboard');
+
+  if (error) {
+    throw new Error(`list_profiles_for_public_leaderboard rpc failed: ${error.message}`);
+  }
+  return ((data ?? []) as { id: string; display_name: string; avatar_url: string | null }[]).map(
+    (r) => ({
+      id: r.id,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+    }),
+  );
+};
+
 export const updateProfileAvatarUrl = async (
   supabase: SupabaseClient,
   userId: string,

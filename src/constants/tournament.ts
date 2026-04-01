@@ -14,6 +14,15 @@ export const KNOCKOUT_MATCHES_COUNT = 32 as const;
 
 export const PREDICTION_DEADLINE = '2026-05-25T23:59:59Z' as const;
 
+/**
+ * Desde esta fecha/hora (inicio del 26 may 2026, hora Argentina UTC−3) los jugadores
+ * con pago confirmado pueden ver en el ranking los pronósticos de otros usuarios.
+ */
+export const VIEW_OTHERS_PREDICTIONS_START_ISO = '2026-05-26T03:00:00.000Z' as const;
+
+export const isViewOthersPredictionsWindowOpen = (now: Date = new Date()): boolean =>
+  now.getTime() >= new Date(VIEW_OTHERS_PREDICTIONS_START_ISO).getTime();
+
 export const GROUP_NAMES = [
   'A',
   'B',

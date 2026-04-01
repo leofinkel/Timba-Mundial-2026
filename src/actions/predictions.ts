@@ -6,17 +6,24 @@ import { createServerClient } from '@/lib/supabase/server';
 import {
   savePredictionsSchema,
   saveSpecialPredictionsSchema,
+  targetUserIdSchema,
   type SavePredictionsSchemaInferred,
   type SaveSpecialPredictionsSchemaInferred,
 } from '@/lib/validation/schemas';
 import {
+  getOtherUserPredictionForViewer,
   getPredictionStatus,
   getUserPrediction,
   lockPrediction,
   savePredictions,
   saveSpecialPredictions,
 } from '@/services/predictionService';
-import type { PredictionStatus, UserPrediction } from '@/types/prediction';
+import type {
+  GetOtherUserPredictionForViewerErrorCode,
+  PredictionStatus,
+  UserPrediction,
+  UserPredictionView,
+} from '@/types/prediction';
 
 const formatZodIssues = (issues: { message: string }[]) =>
   issues.map((i) => i.message).join(', ');
@@ -89,6 +96,42 @@ export const saveSpecialPredictionsAction = async (
   revalidatePath('/fixture');
   revalidatePath('/rankings');
   return { success: true, data: null };
+};
+
+export const getOtherUserPredictionForViewerAction = async (
+  targetUserId: string,
+): Promise<
+  | { success: true; data: UserPredictionView | null }
+  | { success: false; error: string; code?: GetOtherUserPredictionForViewerErrorCode }
+> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      return { success: false, error: authError.message };
+    }
+    if (!user) {
+      return { success: false, error: 'Tenés que iniciar sesión.' };
+    }
+
+    const result = await getOtherUserPredictionForViewer(user.id, parsed.data);
+    if (!result.ok) {
+      return { success: false, error: result.message, code: result.code };
+    }
+    return { success: true, data: result.prediction };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
 };
 
 export const getUserPredictionAction = async (): Promise<

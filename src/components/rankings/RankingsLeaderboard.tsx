@@ -19,13 +19,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { OtherUserPredictionsDialog } from '@/components/rankings/OtherUserPredictionsDialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import type { Leaderboard } from '@/types/ranking';
 import type { UserScoreBreakdown } from '@/types/scoring';
+import type { Tournament } from '@/types/tournament';
 
 interface RankingsLeaderboardProps {
   leaderboard: Leaderboard;
   currentUserId: string;
+  tournament: Tournament;
+  viewerPaid: boolean;
+  canViewOthersPredictions: boolean;
 }
 
 type BreakdownPointsKey = {
@@ -62,11 +68,29 @@ const breakdownRows: { key: BreakdownPointsKey; label: string }[] = [
     { key: 'bestPlayerPoints', label: 'Mejor jugador' },
   ];
 
+const displayNameInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase() || '?';
+};
+
 export const RankingsLeaderboard = ({
   leaderboard,
   currentUserId,
+  tournament,
+  viewerPaid,
+  canViewOthersPredictions,
 }: RankingsLeaderboardProps) => {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [predictionDialogOpen, setPredictionDialogOpen] = useState(false);
+  const [predictionTarget, setPredictionTarget] = useState<{
+    id: string;
+    displayName: string;
+  } | null>(null);
+
+  const showNameLinks = canViewOthersPredictions && viewerPaid;
 
   return (
     <Card className="mx-auto w-full max-w-5xl overflow-hidden border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
@@ -78,6 +102,12 @@ export const RankingsLeaderboard = ({
             dateStyle: 'short',
             timeStyle: 'short',
           })}
+          {showNameLinks ? (
+            <>
+              {' '}
+              · Tocá el nombre de otro jugador para ver sus pronósticos (solo lectura).
+            </>
+          ) : null}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0 sm:px-6">
@@ -96,7 +126,7 @@ export const RankingsLeaderboard = ({
               {leaderboard.entries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-10 text-center text-zinc-500">
-                    Todavía no hay puntos cargados.
+                    Todavía no hay jugadores con planilla cargada en la clasificación.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -118,12 +148,47 @@ export const RankingsLeaderboard = ({
                         </TableCell>
                         <TableCell>{movementIcon(entry.movement)}</TableCell>
                         <TableCell>
-                          <span className="font-medium text-zinc-100">{entry.displayName}</span>
-                          {isSelf ? (
-                            <Badge className="ml-2 border-transparent bg-emerald-600 text-[10px] text-white">
-                              Vos
-                            </Badge>
-                          ) : null}
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Avatar size="sm" className="border border-zinc-700/80">
+                              {entry.avatarUrl ? (
+                                <AvatarImage
+                                  src={entry.avatarUrl}
+                                  alt=""
+                                  className="object-cover"
+                                />
+                              ) : null}
+                              <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-200">
+                                {displayNameInitials(entry.displayName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                              {showNameLinks && !isSelf ? (
+                                <button
+                                  type="button"
+                                  className="min-w-0 truncate text-left font-medium text-emerald-300 underline-offset-2 hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPredictionTarget({
+                                      id: entry.userId,
+                                      displayName: entry.displayName,
+                                    });
+                                    setPredictionDialogOpen(true);
+                                  }}
+                                >
+                                  {entry.displayName}
+                                </button>
+                              ) : (
+                                <span className="min-w-0 truncate font-medium text-zinc-100">
+                                  {entry.displayName}
+                                </span>
+                              )}
+                              {isSelf ? (
+                                <Badge className="shrink-0 border-transparent bg-emerald-600 text-[10px] text-white">
+                                  Vos
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right font-semibold tabular-nums text-zinc-100">
                           {entry.totalPoints}
@@ -169,6 +234,19 @@ export const RankingsLeaderboard = ({
           </Table>
         </div>
       </CardContent>
+
+      <OtherUserPredictionsDialog
+        open={predictionDialogOpen}
+        onOpenChange={(open) => {
+          setPredictionDialogOpen(open);
+          if (!open) {
+            setPredictionTarget(null);
+          }
+        }}
+        targetUserId={predictionTarget?.id ?? null}
+        targetDisplayName={predictionTarget?.displayName ?? ''}
+        tournament={tournament}
+      />
     </Card>
   );
 };
