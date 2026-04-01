@@ -21,6 +21,9 @@ DROP VIEW IF EXISTS public.group_standings CASCADE;
 DROP FUNCTION IF EXISTS public.get_prediction_group_standings(UUID);
 DROP FUNCTION IF EXISTS public.calculate_user_score(UUID);
 DROP FUNCTION IF EXISTS public.recalculate_all_scores();
+DROP FUNCTION IF EXISTS public.advance_knockout_winner(UUID, TEXT);
+DROP FUNCTION IF EXISTS public.populate_round_of_32_direct_slots();
+DROP FUNCTION IF EXISTS public.get_best_third_place_teams();
 
 -- 4) Drop helper/trigger functions from schema.sql
 DROP FUNCTION IF EXISTS public.owns_prediction(UUID);

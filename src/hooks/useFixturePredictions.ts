@@ -1,19 +1,26 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { savePredictionsAction } from '@/actions/predictions';
 import {
   computeGroupStandingsFromPredictions,
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
+import {
+  buildRoundOf32Allocation,
+  resolveDirectSource,
+  THIRD_PLACE_SLOTS,
+  rankThirdPlaceTeams,
+  solveBipartiteMatching,
+} from '@/lib/knockout/thirdPlaceAllocation';
 import type {
   GroupMatchPrediction,
   KnockoutMatchPrediction,
   SpecialPrediction,
   UserPrediction,
 } from '@/types/prediction';
-import type { GroupName, KnockoutMatch, Tournament } from '@/types/tournament';
+import type { GroupName, GroupStanding, KnockoutMatch, Tournament } from '@/types/tournament';
 
 export type UseFixturePredictionsArgs = {
   tournament: Tournament;
@@ -41,21 +48,6 @@ const buildGroupPredictionState = (
   return state;
 };
 
-const resolveKnockoutWinner = (
-  homeTeamId: string,
-  awayTeamId: string,
-  homeGoals: number,
-  awayGoals: number,
-  previousWinnerId: string,
-): string => {
-  if (homeGoals > awayGoals) return homeTeamId;
-  if (awayGoals > homeGoals) return awayTeamId;
-  if (previousWinnerId === homeTeamId || previousWinnerId === awayTeamId) {
-    return previousWinnerId;
-  }
-  return homeTeamId;
-};
-
 const buildKnockoutPredictionState = (
   matches: KnockoutMatch[],
   initial?: KnockoutMatchPrediction[] | undefined,
@@ -66,22 +58,132 @@ const buildKnockoutPredictionState = (
     const ex = byId.get(m.id);
     const homeTeamId = m.homeTeam?.id ?? ex?.homeTeamId ?? '';
     const awayTeamId = m.awayTeam?.id ?? ex?.awayTeamId ?? '';
-    const homeGoals = ex?.homeGoals ?? 0;
-    const awayGoals = ex?.awayGoals ?? 0;
-    let winnerId = ex?.winnerId ?? '';
-    if (homeTeamId && awayTeamId) {
-      winnerId = resolveKnockoutWinner(homeTeamId, awayTeamId, homeGoals, awayGoals, winnerId);
-    }
     state[m.id] = {
       matchId: m.id,
       homeTeamId,
       awayTeamId,
-      homeGoals,
-      awayGoals,
-      winnerId,
+      homeGoals: 0,
+      awayGoals: 0,
+      winnerId: ex?.winnerId ?? '',
     };
   }
   return state;
+};
+
+/**
+ * Build a map: matchId → list of next-match slots that depend on this match's winner.
+ * Parses sources like "W73" to find which subsequent matches reference a given match.
+ */
+const buildWinnerSourceMap = (
+  knockoutMatches: KnockoutMatch[],
+): Map<string, Array<{ matchId: string; side: 'home' | 'away' }>> => {
+  const numToId = new Map<number, string>();
+  for (const m of knockoutMatches) numToId.set(m.matchNumber, m.id);
+
+  const map = new Map<string, Array<{ matchId: string; side: 'home' | 'away' }>>();
+
+  for (const m of knockoutMatches) {
+    for (const [source, side] of [
+      [m.homeSource, 'home'] as const,
+      [m.awaySource, 'away'] as const,
+    ]) {
+      const wMatch = source.match(/^W(\d+)$/);
+      if (wMatch) {
+        const srcId = numToId.get(parseInt(wMatch[1], 10));
+        if (srcId) {
+          const arr = map.get(srcId) ?? [];
+          arr.push({ matchId: m.id, side });
+          map.set(srcId, arr);
+        }
+      }
+      const ruMatch = source.match(/^RU(\d+)$/);
+      if (ruMatch) {
+        const srcId = numToId.get(parseInt(ruMatch[1], 10));
+        if (srcId) {
+          const arr = map.get(`RU:${srcId}`) ?? [];
+          arr.push({ matchId: m.id, side });
+          map.set(`RU:${srcId}`, arr);
+        }
+      }
+    }
+  }
+  return map;
+};
+
+/**
+ * Resolve R32 teams from predicted group standings.
+ */
+const resolveR32Teams = (
+  knockoutMatches: KnockoutMatch[],
+  standings: Record<GroupName, GroupStanding[]>,
+): Record<string, { homeTeamId: string; awayTeamId: string }> => {
+  const standingsByGroup = new Map<string, string[]>();
+  for (const [g, rows] of Object.entries(standings)) {
+    standingsByGroup.set(
+      g,
+      rows.map((r) => r.team.id),
+    );
+  }
+
+  const thirds = Object.entries(standings)
+    .map(([groupId, rows]) => {
+      const third = rows[2];
+      if (!third) return null;
+      return {
+        groupId,
+        teamId: third.team.id,
+        points: third.points,
+        goalDifference: third.goalDifference,
+        goalsFor: third.goalsFor,
+      };
+    })
+    .filter(Boolean) as Array<{
+    groupId: string;
+    teamId: string;
+    points: number;
+    goalDifference: number;
+    goalsFor: number;
+  }>;
+
+  const ranked = rankThirdPlaceTeams(thirds);
+  const qualifying = ranked.slice(0, 8);
+  const qualifyingGroups = qualifying.map((t) => t.groupId).sort();
+  const allocation = solveBipartiteMatching(qualifyingGroups, THIRD_PLACE_SLOTS);
+
+  const thirdTeamByGroup = new Map<string, string>();
+  for (const t of qualifying) thirdTeamByGroup.set(t.groupId, t.teamId);
+
+  const result: Record<string, { homeTeamId: string; awayTeamId: string }> = {};
+
+  for (const m of knockoutMatches) {
+    if (m.round !== 'round-of-32') continue;
+
+    let homeTeamId = m.homeTeam?.id ?? '';
+    let awayTeamId = m.awayTeam?.id ?? '';
+
+    if (!homeTeamId && m.homeSource) {
+      homeTeamId = resolveDirectSource(m.homeSource, standingsByGroup) ?? '';
+    }
+
+    if (!awayTeamId && m.awaySource) {
+      if (m.awaySource.startsWith('3-')) {
+        for (const [group, matchNum] of allocation) {
+          if (matchNum === m.matchNumber) {
+            awayTeamId = thirdTeamByGroup.get(group) ?? '';
+            break;
+          }
+        }
+      } else {
+        awayTeamId = resolveDirectSource(m.awaySource, standingsByGroup) ?? '';
+      }
+    }
+
+    if (homeTeamId || awayTeamId) {
+      result[m.id] = { homeTeamId, awayTeamId };
+    }
+  }
+
+  return result;
 };
 
 export const useFixturePredictions = ({
@@ -115,6 +217,103 @@ export const useFixturePredictions = ({
     return out;
   }, [tournament.groups, groupPredictions]);
 
+  const winnerSourceMap = useMemo(
+    () => buildWinnerSourceMap(tournament.knockoutMatches),
+    [tournament.knockoutMatches],
+  );
+
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const r32Teams = resolveR32Teams(
+      tournament.knockoutMatches,
+      calculatedStandings,
+    );
+
+    setKnockoutPredictions((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const [matchId, teams] of Object.entries(r32Teams)) {
+        const cur = next[matchId];
+        if (!cur) continue;
+        if (cur.homeTeamId !== teams.homeTeamId || cur.awayTeamId !== teams.awayTeamId) {
+          changed = true;
+          let winnerId = cur.winnerId;
+          if (
+            winnerId &&
+            winnerId !== teams.homeTeamId &&
+            winnerId !== teams.awayTeamId
+          ) {
+            winnerId = '';
+          }
+          next[matchId] = { ...cur, ...teams, winnerId };
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [calculatedStandings, tournament.knockoutMatches]);
+
+  const cascadeWinner = useCallback(
+    (
+      state: Record<string, KnockoutMatchPrediction>,
+      matchId: string,
+    ): Record<string, KnockoutMatchPrediction> => {
+      const pred = state[matchId];
+      if (!pred?.winnerId) return state;
+
+      const targets = winnerSourceMap.get(matchId) ?? [];
+      let next = state;
+
+      for (const t of targets) {
+        const target = next[t.matchId];
+        if (!target) continue;
+
+        const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
+        if (target[teamKey] !== pred.winnerId) {
+          if (next === state) next = { ...state };
+          let winnerId = target.winnerId;
+          if (
+            winnerId &&
+            winnerId !== (t.side === 'home' ? pred.winnerId : target.homeTeamId) &&
+            winnerId !== (t.side === 'away' ? pred.winnerId : target.awayTeamId)
+          ) {
+            winnerId = '';
+          }
+          next[t.matchId] = { ...target, [teamKey]: pred.winnerId, winnerId };
+          next = cascadeWinner(next, t.matchId);
+        }
+      }
+
+      const loserTargets = winnerSourceMap.get(`RU:${matchId}`) ?? [];
+      const loserId =
+        pred.homeTeamId === pred.winnerId
+          ? pred.awayTeamId
+          : pred.homeTeamId;
+
+      if (loserId) {
+        for (const t of loserTargets) {
+          const target = next[t.matchId];
+          if (!target) continue;
+          const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
+          if (target[teamKey] !== loserId) {
+            if (next === state) next = { ...state };
+            next[t.matchId] = { ...target, [teamKey]: loserId };
+          }
+        }
+      }
+
+      return next;
+    },
+    [winnerSourceMap],
+  );
+
   const updateGroupMatch = useCallback(
     (matchId: string, homeGoals: number | null, awayGoals: number | null) => {
       if (isLocked) return;
@@ -132,19 +331,18 @@ export const useFixturePredictions = ({
       setKnockoutPredictions((prev) => {
         const cur = prev[matchId];
         if (!cur) return prev;
-        const next: KnockoutMatchPrediction = { ...cur, ...patch };
-        if (next.homeTeamId && next.awayTeamId) {
-          if (next.homeGoals !== next.awayGoals) {
-            next.winnerId =
-              next.homeGoals > next.awayGoals ? next.homeTeamId : next.awayTeamId;
-          } else if (next.winnerId !== next.homeTeamId && next.winnerId !== next.awayTeamId) {
-            next.winnerId = next.homeTeamId;
-          }
+
+        const updated: KnockoutMatchPrediction = { ...cur, ...patch };
+        let next = { ...prev, [matchId]: updated };
+
+        if (patch.winnerId) {
+          next = cascadeWinner(next, matchId);
         }
-        return { ...prev, [matchId]: next };
+
+        return next;
       });
     },
-    [isLocked],
+    [isLocked, cascadeWinner],
   );
 
   const updateSpecial = useCallback(
@@ -191,10 +389,7 @@ export const useFixturePredictions = ({
         groupPredictions: groupPredictionsPayload,
         knockoutPredictions:
           knockoutPredictionsPayload.length > 0 ? knockoutPredictionsPayload : undefined,
-        specialPredictions: {
-          topScorer: top,
-          bestPlayer: best,
-        },
+        specialPredictions: { topScorer: top, bestPlayer: best },
       });
 
       if (!result.success) {

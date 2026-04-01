@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
+import { advanceKnockoutWinner, populateRoundOf32 } from '@/services/knockoutService';
 import type { FinishedMatchResult, OfficialSpecialResultsInput } from '@/types/tournament';
 
 import { isAdmin } from '@/services/adminService';
@@ -14,12 +15,8 @@ const winnerFromGoals = (
   homeTeamId: string | null,
   awayTeamId: string | null,
 ): string | null => {
-  if (homeGoals > awayGoals) {
-    return homeTeamId;
-  }
-  if (awayGoals > homeGoals) {
-    return awayTeamId;
-  }
+  if (homeGoals > awayGoals) return homeTeamId;
+  if (awayGoals > homeGoals) return awayTeamId;
   return null;
 };
 
@@ -28,6 +25,7 @@ export const saveMatchResult = async (
   homeGoals: number,
   awayGoals: number,
   adminId: string,
+  winnerOverride?: string,
 ): Promise<FinishedMatchResult> => {
   try {
     const admin = await isAdmin(adminId);
@@ -39,9 +37,7 @@ export const saveMatchResult = async (
     const supabase = await createServerClient();
     const { data: match, error: fetchErr } = await supabase
       .from('matches')
-      .select(
-        'id, stage, group_id, home_team_id, away_team_id, played_at',
-      )
+      .select('id, stage, group_id, home_team_id, away_team_id, played_at')
       .eq('id', matchId)
       .single();
 
@@ -50,12 +46,17 @@ export const saveMatchResult = async (
       throw new Error(fetchErr?.message ?? 'Match not found');
     }
 
-    const winnerTeamId = winnerFromGoals(
+    const isKnockout = match.stage !== 'group';
+    let winnerTeamId = winnerFromGoals(
       homeGoals,
       awayGoals,
       match.home_team_id,
       match.away_team_id,
     );
+
+    if (isKnockout && !winnerTeamId && winnerOverride) {
+      winnerTeamId = winnerOverride;
+    }
 
     const { data: updated, error: upErr } = await supabase
       .from('matches')
@@ -76,7 +77,21 @@ export const saveMatchResult = async (
       throw new Error(upErr?.message ?? 'Failed to save result');
     }
 
-    log.info({ matchId, adminId }, 'Match result saved');
+    log.info({ matchId, adminId, stage: match.stage }, 'Match result saved');
+
+    if (match.stage === 'group') {
+      try {
+        await populateRoundOf32();
+      } catch (e) {
+        log.error({ err: e }, 'Auto-populate R32 failed (non-blocking)');
+      }
+    } else if (updated.winner_team_id) {
+      try {
+        await advanceKnockoutWinner(matchId, updated.winner_team_id);
+      } catch (e) {
+        log.error({ err: e }, 'Auto-advance knockout failed (non-blocking)');
+      }
+    }
 
     return {
       matchId: updated.id,
@@ -92,6 +107,55 @@ export const saveMatchResult = async (
   } catch (err) {
     log.error({ err, matchId, adminId }, 'saveMatchResult failed');
     throw err instanceof Error ? err : new Error('saveMatchResult failed');
+  }
+};
+
+/** Admin-only: set the winner of a knockout match (no scores) and advance. */
+export const saveKnockoutWinner = async (
+  matchId: string,
+  winnerTeamId: string,
+  adminId: string,
+): Promise<FinishedMatchResult> => {
+  try {
+    const admin = await isAdmin(adminId);
+    if (!admin) {
+      log.warn({ adminId, matchId }, 'saveKnockoutWinner denied');
+      throw new Error('Only admins can set knockout winners');
+    }
+
+    const supabase = await createServerClient();
+    const { data: updated, error: upErr } = await supabase
+      .from('matches')
+      .update({ winner_team_id: winnerTeamId })
+      .eq('id', matchId)
+      .select(
+        'id, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id, played_at',
+      )
+      .single();
+
+    if (upErr || !updated) {
+      log.error({ err: upErr, matchId }, 'saveKnockoutWinner update failed');
+      throw new Error(upErr?.message ?? 'Failed to set knockout winner');
+    }
+
+    log.info({ matchId, winnerTeamId, adminId }, 'Knockout winner set');
+
+    await advanceKnockoutWinner(matchId, winnerTeamId);
+
+    return {
+      matchId: updated.id,
+      stage: updated.stage,
+      groupId: updated.group_id,
+      homeTeamId: updated.home_team_id,
+      awayTeamId: updated.away_team_id,
+      homeGoals: updated.home_goals ?? 0,
+      awayGoals: updated.away_goals ?? 0,
+      winnerTeamId: updated.winner_team_id,
+      playedAt: updated.played_at,
+    };
+  } catch (err) {
+    log.error({ err, matchId, adminId }, 'saveKnockoutWinner failed');
+    throw err instanceof Error ? err : new Error('saveKnockoutWinner failed');
   }
 };
 

@@ -69,6 +69,11 @@ export const adminResultSchema = z.object({
   awayGoals: z.number().int().min(0),
 });
 
+export const knockoutResultSchema = z.object({
+  matchId: z.string().min(1),
+  winnerTeamId: z.string().min(1),
+});
+
 export const paymentStatusUpdateSchema = z.enum(['pending', 'paid']);
 
 export const adminGameRuleSchema = z.object({
@@ -111,6 +116,7 @@ export type KnockoutMatchPredictionSchemaInferred = z.infer<
 export type SaveSpecialPredictionsSchemaInferred = z.infer<typeof saveSpecialPredictionsSchema>;
 export type SaveSpecialResultsSchemaInferred = z.infer<typeof saveSpecialResultsSchema>;
 export type AdminResultSchemaInferred = z.infer<typeof adminResultSchema>;
+export type KnockoutResultSchemaInferred = z.infer<typeof knockoutResultSchema>;
 export type AdminGameRuleSchemaInferred = z.infer<typeof adminGameRuleSchema>;
 export type AdminMatchSchemaInferred = z.infer<typeof adminMatchSchema>;
 export type AdminClassificationUpdateSchemaInferred = z.infer<

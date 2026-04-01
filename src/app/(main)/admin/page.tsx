@@ -46,6 +46,10 @@ const AdminPage = async () => {
       label: `${home} vs ${away} · ${m.stage}${group}`,
       homeGoals: m.home_goals,
       awayGoals: m.away_goals,
+      stage: m.stage,
+      homeTeamId: m.home_team_id,
+      awayTeamId: m.away_team_id,
+      winnerTeamId: m.winner_team_id,
     };
   });
 

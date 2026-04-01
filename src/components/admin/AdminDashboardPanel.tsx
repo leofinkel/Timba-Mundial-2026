@@ -28,6 +28,10 @@ interface MatchOption {
   label: string;
   homeGoals: number | null;
   awayGoals: number | null;
+  stage: string;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  winnerTeamId: string | null;
 }
 
 interface TeamOption {

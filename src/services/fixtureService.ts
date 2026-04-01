@@ -120,6 +120,7 @@ export const getTournament = async (): Promise<Tournament> => {
       winner: m.winner_team_id ? teamsById.get(m.winner_team_id) ?? null : null,
       homeSource: m.home_source ?? '',
       awaySource: m.away_source ?? '',
+      playedAt: m.played_at,
     }));
 
   log.info(

@@ -86,6 +86,7 @@ export interface KnockoutMatch {
   winner: Team | null;
   homeSource: string;
   awaySource: string;
+  playedAt: string | null;
 }
 
 export interface Tournament {

@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import { saveMatchResultAction, saveSpecialResultsAction } from '@/actions/results';
+import { saveMatchResultAction, saveKnockoutWinnerAction, saveSpecialResultsAction } from '@/actions/results';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,10 @@ interface MatchOption {
   label: string;
   homeGoals: number | null;
   awayGoals: number | null;
+  stage: string;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  winnerTeamId: string | null;
 }
 
 interface TeamOption {
@@ -35,10 +39,13 @@ interface AdminResultsTabProps {
   teams: TeamOption[];
 }
 
+const UNSET = '__unset__';
+
 export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) => {
   const [matchId, setMatchId] = useState(matchOptions[0]?.id ?? '');
   const [homeGoals, setHomeGoals] = useState('0');
   const [awayGoals, setAwayGoals] = useState('0');
+  const [winnerOverride, setWinnerOverride] = useState(UNSET);
   const [pendingMatch, startMatchTransition] = useTransition();
 
   const [championTeamId, setChampionTeamId] = useState(teams[0]?.id ?? '');
@@ -54,6 +61,19 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
     [matchOptions, matchId],
   );
 
+  const isKnockout = selected ? selected.stage !== 'group' : false;
+  const isDraw =
+    homeGoals !== '' &&
+    awayGoals !== '' &&
+    Number.parseInt(homeGoals, 10) === Number.parseInt(awayGoals, 10);
+
+  const knockoutTeams = useMemo(() => {
+    if (!selected || !isKnockout) return [];
+    return teams.filter(
+      (t) => t.id === selected.homeTeamId || t.id === selected.awayTeamId,
+    );
+  }, [selected, isKnockout, teams]);
+
   const submitMatch = () => {
     const home = Number.parseInt(homeGoals, 10);
     const away = Number.parseInt(awayGoals, 10);
@@ -61,13 +81,35 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
       toast.error('Completá partido y goles válidos');
       return;
     }
+    if (isKnockout && home === away && winnerOverride === UNSET) {
+      toast.error('En eliminatorias con empate, seleccioná un ganador (penales)');
+      return;
+    }
     startMatchTransition(async () => {
-      const res = await saveMatchResultAction(matchId, home, away);
+      const override = isKnockout && home === away && winnerOverride !== UNSET
+        ? winnerOverride
+        : undefined;
+      const res = await saveMatchResultAction(matchId, home, away, override);
       if (!res.success) {
         toast.error(res.error);
         return;
       }
-      toast.success('Resultado guardado');
+      toast.success('Resultado guardado — equipos avanzados automáticamente');
+    });
+  };
+
+  const submitKnockoutWinner = () => {
+    if (!matchId || winnerOverride === UNSET) {
+      toast.error('Seleccioná el ganador');
+      return;
+    }
+    startMatchTransition(async () => {
+      const res = await saveKnockoutWinnerAction(matchId, winnerOverride);
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Ganador guardado — equipo avanzado automáticamente');
     });
   };
 
@@ -110,6 +152,11 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
           <CardTitle>Resultados de partido</CardTitle>
           <CardDescription>
             Elegí el encuentro y cargá el marcador oficial.
+            {isKnockout && (
+              <span className="ml-1 text-emerald-400">
+                (Eliminatoria — el ganador avanza automáticamente)
+              </span>
+            )}
             {selected &&
               (selected.homeGoals != null || selected.awayGoals != null) &&
               ` Actual: ${selected.homeGoals ?? '—'} - ${selected.awayGoals ?? '—'}`}
@@ -133,6 +180,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex flex-wrap gap-4">
             <div className="space-y-2">
               <Label htmlFor="home-goals">Local</Label>
@@ -157,14 +205,69 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
               />
             </div>
           </div>
-          <Button
-            type="button"
-            className="bg-emerald-600 text-white hover:bg-emerald-600/90"
-            disabled={pendingMatch}
-            onClick={submitMatch}
-          >
-            Guardar resultado
-          </Button>
+
+          {isKnockout && isDraw && knockoutTeams.length === 2 ? (
+            <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+              <Label className="text-amber-200">Ganador por penales (empate)</Label>
+              <Select value={winnerOverride} onValueChange={setWinnerOverride}>
+                <SelectTrigger className="w-full max-w-xs">
+                  <SelectValue placeholder="Seleccionar ganador…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET} disabled>
+                    Seleccionar…
+                  </SelectItem>
+                  {knockoutTeams.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              className="bg-emerald-600 text-white hover:bg-emerald-600/90"
+              disabled={pendingMatch}
+              onClick={submitMatch}
+            >
+              Guardar resultado
+            </Button>
+
+            {isKnockout && knockoutTeams.length === 2 ? (
+              <>
+                <Separator orientation="vertical" className="h-9" />
+                <div className="flex items-end gap-2">
+                  <Select value={winnerOverride} onValueChange={setWinnerOverride}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Ganador directo…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNSET} disabled>
+                        Seleccionar…
+                      </SelectItem>
+                      {knockoutTeams.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pendingMatch || winnerOverride === UNSET}
+                    onClick={submitKnockoutWinner}
+                  >
+                    Solo ganador
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
