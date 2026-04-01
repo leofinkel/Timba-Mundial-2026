@@ -4,6 +4,8 @@ import { AlertTriangle, Lock } from 'lucide-react';
 
 import { getCurrentUser } from '@/actions/auth';
 import { getUserPredictionAction } from '@/actions/predictions';
+import { getTournament } from '@/services/fixtureService';
+import type { Tournament } from '@/types/tournament';
 import { FixturePredictionTabs } from '@/components/fixture/FixturePredictionTabs';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,8 +14,18 @@ import { PREDICTION_DEADLINE } from '@/constants/tournament';
 const deadlineDate = parseISO(PREDICTION_DEADLINE);
 
 const FixturePage = async () => {
-  const userResult = await getCurrentUser();
-  const user = userResult.success ? userResult.data : null;
+  let tournament: Tournament | null = null;
+  const [userResult, tournamentResult] = await Promise.allSettled([
+    getCurrentUser(),
+    getTournament(),
+  ]);
+
+  const user =
+    userResult.status === 'fulfilled' && userResult.value.success
+      ? userResult.value.data
+      : null;
+  tournament =
+    tournamentResult.status === 'fulfilled' ? tournamentResult.value : null;
 
   const predictionResult = user ? await getUserPredictionAction() : null;
   const prediction = predictionResult?.success ? predictionResult.data : null;
@@ -102,7 +114,13 @@ const FixturePage = async () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FixturePredictionTabs saveDisabled={!canSave} saveDisabledReason={saveDisabledReason} />
+          <FixturePredictionTabs
+            isLoggedIn={!!user}
+            saveDisabled={!canSave}
+            saveDisabledReason={saveDisabledReason}
+            tournament={tournament}
+            initialPrediction={prediction}
+          />
         </CardContent>
       </Card>
     </div>

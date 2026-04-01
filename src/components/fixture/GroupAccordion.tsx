@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { GroupMatchCard } from '@/components/fixture/GroupMatchCard';
+import { TeamFlag } from '@/components/fixture/TeamFlag';
 import type { GroupPredictionState } from '@/hooks/useFixturePredictions';
 import type { Group, GroupStanding } from '@/types/tournament';
 
@@ -101,8 +102,11 @@ export const GroupAccordion = ({
                     <TableCell className="px-1 text-center font-medium tabular-nums">
                       {row.position}
                     </TableCell>
-                    <TableCell className="max-w-[120px] truncate px-1 font-medium">
-                      {row.team.name}
+                    <TableCell className="px-1">
+                      <div className="flex items-center gap-1.5">
+                        <TeamFlag team={row.team} size="sm" />
+                        <span className="max-w-[100px] truncate font-medium">{row.team.name}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="px-1 text-center tabular-nums">{row.points}</TableCell>
                     <TableCell className="px-1 text-center tabular-nums">

@@ -408,10 +408,9 @@ CREATE POLICY "profiles_delete_admin"
 -- -----------------------------------------------------------------------------
 -- game_rules: all authenticated can read; admins maintain
 -- -----------------------------------------------------------------------------
-CREATE POLICY "game_rules_select_authenticated"
+CREATE POLICY "game_rules_select_public"
   ON public.game_rules
   FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "game_rules_write_admin"
@@ -424,10 +423,9 @@ CREATE POLICY "game_rules_write_admin"
 -- -----------------------------------------------------------------------------
 -- teams & matches: readable by any signed-in user; writes admin-only
 -- -----------------------------------------------------------------------------
-CREATE POLICY "teams_select_authenticated"
+CREATE POLICY "teams_select_public"
   ON public.teams
   FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "teams_write_admin"
@@ -437,10 +435,9 @@ CREATE POLICY "teams_write_admin"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
-CREATE POLICY "matches_select_authenticated"
+CREATE POLICY "matches_select_public"
   ON public.matches
   FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "matches_write_admin"

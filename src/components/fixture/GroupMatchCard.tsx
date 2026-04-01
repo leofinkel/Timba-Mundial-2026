@@ -1,11 +1,10 @@
 'use client';
 
-import Image from 'next/image';
-
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TeamFlag } from '@/components/fixture/TeamFlag';
 import { cn } from '@/lib/utils';
 import type { GroupMatch } from '@/types/tournament';
 
@@ -52,19 +51,7 @@ export const GroupMatchCard = ({
     >
       <div className="flex flex-col gap-3 px-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {match.homeTeam.flagUrl ? (
-            <Image
-              src={match.homeTeam.flagUrl}
-              alt=""
-              width={28}
-              height={20}
-              className="h-5 w-7 shrink-0 rounded-sm border border-border/60 object-cover"
-            />
-          ) : (
-            <span className="flex h-5 w-7 shrink-0 items-center justify-center rounded-sm border border-dashed border-muted-foreground/40 text-[10px] text-muted-foreground">
-              —
-            </span>
-          )}
+          <TeamFlag team={match.homeTeam} />
           <span className="truncate text-sm font-medium">{match.homeTeam.name}</span>
         </div>
 
@@ -112,19 +99,7 @@ export const GroupMatchCard = ({
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-row-reverse">
           <span className="truncate text-right text-sm font-medium">{match.awayTeam.name}</span>
-          {match.awayTeam.flagUrl ? (
-            <Image
-              src={match.awayTeam.flagUrl}
-              alt=""
-              width={28}
-              height={20}
-              className="h-5 w-7 shrink-0 rounded-sm border border-border/60 object-cover"
-            />
-          ) : (
-            <span className="flex h-5 w-7 shrink-0 items-center justify-center rounded-sm border border-dashed border-muted-foreground/40 text-[10px] text-muted-foreground">
-              —
-            </span>
-          )}
+          <TeamFlag team={match.awayTeam} />
         </div>
       </div>
 

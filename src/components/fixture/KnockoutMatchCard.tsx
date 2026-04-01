@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { ChevronRight, Trophy } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { TeamFlag } from '@/components/fixture/TeamFlag';
 import type { KnockoutMatchPrediction } from '@/types/prediction';
 import type { KnockoutMatch, Team } from '@/types/tournament';
 
@@ -34,21 +33,6 @@ const parseGoalInput = (raw: string): number => {
   if (Number.isNaN(n)) return 0;
   return Math.min(99, Math.max(0, n));
 };
-
-const TeamFlag = ({ team, className }: { team: Team; className?: string }) =>
-  team.flagUrl ? (
-    <Image
-      src={team.flagUrl}
-      alt=""
-      width={24}
-      height={18}
-      className={cn('h-5 w-6 shrink-0 rounded-sm border border-border/60 object-cover', className)}
-    />
-  ) : (
-    <span className="flex h-5 w-6 shrink-0 items-center justify-center rounded-sm border border-dashed border-muted-foreground/40 text-[8px] text-muted-foreground">
-      —
-    </span>
-  );
 
 export const KnockoutMatchCard = ({
   match,
@@ -118,7 +102,10 @@ export const KnockoutMatchCard = ({
                   </SelectItem>
                   {homeOptions.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name}
+                      <span className="flex items-center gap-2">
+                        <TeamFlag team={t} size="sm" />
+                        {t.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -179,7 +166,10 @@ export const KnockoutMatchCard = ({
                   </SelectItem>
                   {awayOptions.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name}
+                      <span className="flex items-center gap-2">
+                        <TeamFlag team={t} size="sm" />
+                        {t.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

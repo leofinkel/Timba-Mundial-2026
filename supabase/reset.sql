@@ -16,7 +16,13 @@ DROP TABLE IF EXISTS public.teams CASCADE;
 DROP TABLE IF EXISTS public.game_rules CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- 3) Drop helper/trigger functions from schema.sql
+-- 3) Drop views and functions from functions.sql
+DROP VIEW IF EXISTS public.group_standings CASCADE;
+DROP FUNCTION IF EXISTS public.get_prediction_group_standings(UUID);
+DROP FUNCTION IF EXISTS public.calculate_user_score(UUID);
+DROP FUNCTION IF EXISTS public.recalculate_all_scores();
+
+-- 4) Drop helper/trigger functions from schema.sql
 DROP FUNCTION IF EXISTS public.owns_prediction(UUID);
 DROP FUNCTION IF EXISTS public.is_admin();
 DROP FUNCTION IF EXISTS public.handle_new_user();

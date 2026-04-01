@@ -5,13 +5,16 @@ import { revalidatePath } from 'next/cache';
 import { createServerClient } from '@/lib/supabase/server';
 import {
   savePredictionsSchema,
+  saveSpecialPredictionsSchema,
   type SavePredictionsSchemaInferred,
+  type SaveSpecialPredictionsSchemaInferred,
 } from '@/lib/validation/schemas';
 import {
   getPredictionStatus,
   getUserPrediction,
   lockPrediction,
   savePredictions,
+  saveSpecialPredictions,
 } from '@/services/predictionService';
 import type { PredictionStatus, UserPrediction } from '@/types/prediction';
 
@@ -50,6 +53,39 @@ export const savePredictionsAction = async (
 
   revalidatePath('/');
   revalidatePath('/dashboard');
+  revalidatePath('/fixture');
+  revalidatePath('/rankings');
+  return { success: true, data: null };
+};
+
+export const saveSpecialPredictionsAction = async (
+  data: SaveSpecialPredictionsSchemaInferred,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) return { success: false, error: authError.message };
+  if (!user) return { success: false, error: 'Not authenticated' };
+
+  const parsed = saveSpecialPredictionsSchema.safeParse(data);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: formatZodIssues(parsed.error.issues) || 'Invalid input',
+    };
+  }
+
+  const result = await saveSpecialPredictions(
+    user.id,
+    parsed.data.topScorer.trim(),
+    parsed.data.bestPlayer.trim(),
+  );
+
+  if (!result.success) return { success: false, error: result.error };
+
   revalidatePath('/fixture');
   revalidatePath('/rankings');
   return { success: true, data: null };

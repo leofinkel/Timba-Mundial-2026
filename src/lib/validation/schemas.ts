@@ -42,6 +42,11 @@ export const savePredictionsSchema = z.object({
   }),
 });
 
+export const saveSpecialPredictionsSchema = z.object({
+  topScorer: z.string().min(2, 'El goleador debe tener al menos 2 caracteres'),
+  bestPlayer: z.string().min(2, 'La figura debe tener al menos 2 caracteres'),
+});
+
 export const saveSpecialResultsSchema = z.object({
   championTeamId: z.string().min(1),
   runnerUpTeamId: z.string().min(1),
@@ -103,6 +108,7 @@ export type SavePredictionsSchemaInferred = z.infer<typeof savePredictionsSchema
 export type KnockoutMatchPredictionSchemaInferred = z.infer<
   typeof knockoutMatchPredictionSchema
 >;
+export type SaveSpecialPredictionsSchemaInferred = z.infer<typeof saveSpecialPredictionsSchema>;
 export type SaveSpecialResultsSchemaInferred = z.infer<typeof saveSpecialResultsSchema>;
 export type AdminResultSchemaInferred = z.infer<typeof adminResultSchema>;
 export type AdminGameRuleSchemaInferred = z.infer<typeof adminGameRuleSchema>;

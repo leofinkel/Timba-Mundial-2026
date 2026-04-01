@@ -198,6 +198,42 @@ export const savePredictions = async (
   }
 };
 
+export const saveSpecialPredictions = async (
+  userId: string,
+  topScorer: string,
+  bestPlayer: string,
+): Promise<{ success: true } | { success: false; error: string }> => {
+  try {
+    const supabase = await createServerClient();
+
+    const paid = await profileRepository.isPaymentPaid(supabase, userId);
+    if (!paid) {
+      log.warn({ userId }, 'saveSpecialPredictions: not paid');
+      return { success: false, error: 'User must be marked as paid' };
+    }
+
+    if (deadlinePassed()) {
+      log.warn({ userId }, 'saveSpecialPredictions: deadline passed');
+      return { success: false, error: 'Prediction deadline has passed' };
+    }
+
+    const existing = await predictionRepository.getPredictionByUserId(supabase, userId);
+    if (existing?.is_locked) {
+      return { success: false, error: 'Prediction is locked' };
+    }
+
+    const pred = await predictionRepository.upsertPredictionRow(supabase, userId);
+    await predictionRepository.upsertPredictionSpecials(supabase, pred.id, topScorer, bestPlayer);
+
+    log.info({ userId, predictionId: pred.id }, 'saveSpecialPredictions');
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ userId, err: message }, 'saveSpecialPredictions failed');
+    return { success: false, error: message };
+  }
+};
+
 export const lockPrediction = async (
   userId: string,
 ): Promise<UserPrediction> => {

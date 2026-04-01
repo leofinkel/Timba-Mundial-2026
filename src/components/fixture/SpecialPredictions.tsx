@@ -5,7 +5,6 @@ import { Star, Trophy } from 'lucide-react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -32,10 +31,7 @@ export const SpecialPredictions = ({
       <CardHeader className="border-b border-border/60 bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Trophy className="size-6 text-amber-500" aria-hidden />
-          <div>
-            <CardTitle className="text-lg">Pronósticos especiales</CardTitle>
-            <CardDescription>Figuras del Mundial 2026</CardDescription>
-          </div>
+          <CardTitle className="text-lg">Pronósticos especiales</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="grid gap-6 pt-6 sm:grid-cols-2">
