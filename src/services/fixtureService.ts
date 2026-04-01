@@ -93,6 +93,7 @@ export const getTournament = async (): Promise<Tournament> => {
       awayTeam: away,
       homeGoals: m.home_goals,
       awayGoals: m.away_goals,
+      playedAt: m.played_at,
     });
   }
 

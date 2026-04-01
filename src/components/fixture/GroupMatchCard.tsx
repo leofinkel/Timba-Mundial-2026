@@ -1,5 +1,8 @@
 'use client';
 
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +28,17 @@ const parseGoalInput = (raw: string): number | null => {
   return clampGoal(n);
 };
 
+const UTC_MINUS_5_OFFSET_MS = -5 * 60 * 60 * 1000;
+
+const formatMatchDate = (isoDate: string): string => {
+  const utc = new Date(isoDate);
+  const local = new Date(utc.getTime() + UTC_MINUS_5_OFFSET_MS);
+  const day = format(local, "d MMM", { locale: es });
+  const hours = local.getUTCHours().toString().padStart(2, '0');
+  const mins = local.getUTCMinutes().toString().padStart(2, '0');
+  return `${day} · ${hours}:${mins} hs`;
+};
+
 export const GroupMatchCard = ({
   match,
   homeGoals,
@@ -44,73 +58,70 @@ export const GroupMatchCard = ({
   return (
     <Card
       className={cn(
-        'gap-0 border bg-gradient-to-br from-background via-background to-emerald-500/5 py-3 shadow-sm transition-colors',
-        matchesOfficial && 'border-emerald-500/70 ring-1 ring-emerald-500/40',
-        !matchesOfficial && 'border-border/80',
+        'gap-0 border py-2.5 shadow-sm transition-colors',
+        matchesOfficial && 'border-emerald-500/70 bg-emerald-500/5 ring-1 ring-emerald-500/40',
+        !matchesOfficial && 'border-border/60 bg-card/60',
       )}
     >
-      <div className="flex flex-col gap-3 px-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      {match.playedAt && (
+        <p className="px-3 pb-1 text-[11px] tabular-nums text-muted-foreground/70">
+          {formatMatchDate(match.playedAt)}
+        </p>
+      )}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2 px-3">
+        <div className="flex items-center gap-2 overflow-hidden">
           <TeamFlag team={match.homeTeam} />
-          <span className="truncate text-sm font-medium">{match.homeTeam.name}</span>
+          <span className="truncate text-sm font-medium leading-tight">{match.homeTeam.name}</span>
         </div>
 
-        <div className="flex shrink-0 items-center justify-center gap-1.5 sm:mx-1">
-          <div className="flex flex-col gap-0.5">
-            <Label htmlFor={`hg-${match.id}`} className="sr-only">
-              Goles local
-            </Label>
-            <Input
-              id={`hg-${match.id}`}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              disabled={disabled}
-              maxLength={2}
-              className="h-8 w-11 max-w-[3rem] text-center text-sm tabular-nums"
-              value={homeGoals === null ? '' : String(homeGoals)}
-              onChange={(e) => {
-                const v = parseGoalInput(e.target.value);
-                onScoresChange(match.id, v, awayGoals);
-              }}
-            />
-          </div>
-          <span className="pb-1 text-muted-foreground">—</span>
-          <div className="flex flex-col gap-0.5">
-            <Label htmlFor={`ag-${match.id}`} className="sr-only">
-              Goles visitante
-            </Label>
-            <Input
-              id={`ag-${match.id}`}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              disabled={disabled}
-              maxLength={2}
-              className="h-8 w-11 max-w-[3rem] text-center text-sm tabular-nums"
-              value={awayGoals === null ? '' : String(awayGoals)}
-              onChange={(e) => {
-                const v = parseGoalInput(e.target.value);
-                onScoresChange(match.id, homeGoals, v);
-              }}
-            />
-          </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Label htmlFor={`hg-${match.id}`} className="sr-only">Goles local</Label>
+          <Input
+            id={`hg-${match.id}`}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            disabled={disabled}
+            maxLength={2}
+            className="h-8 w-10 rounded-md border-border/60 bg-zinc-900/60 text-center text-sm tabular-nums focus:border-emerald-500/50 focus:ring-emerald-500/30"
+            value={homeGoals === null ? '' : String(homeGoals)}
+            onChange={(e) => {
+              const v = parseGoalInput(e.target.value);
+              onScoresChange(match.id, v, awayGoals);
+            }}
+          />
+          <span className="text-xs text-muted-foreground/60">vs</span>
+          <Label htmlFor={`ag-${match.id}`} className="sr-only">Goles visitante</Label>
+          <Input
+            id={`ag-${match.id}`}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            disabled={disabled}
+            maxLength={2}
+            className="h-8 w-10 rounded-md border-border/60 bg-zinc-900/60 text-center text-sm tabular-nums focus:border-emerald-500/50 focus:ring-emerald-500/30"
+            value={awayGoals === null ? '' : String(awayGoals)}
+            onChange={(e) => {
+              const v = parseGoalInput(e.target.value);
+              onScoresChange(match.id, homeGoals, v);
+            }}
+          />
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-row-reverse">
-          <span className="truncate text-right text-sm font-medium">{match.awayTeam.name}</span>
+        <div className="flex items-center justify-end gap-2 overflow-hidden">
+          <span className="truncate text-right text-sm font-medium leading-tight">{match.awayTeam.name}</span>
           <TeamFlag team={match.awayTeam} />
         </div>
       </div>
 
       {hasRealResult && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-3 pt-2">
-          <span className="text-xs text-muted-foreground">Resultado real:</span>
-          <Badge variant="outline" className="font-mono text-xs tabular-nums">
-            {match.homeGoals} — {match.awayGoals}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 border-t border-border/40 px-3 pt-1.5">
+          <span className="text-xs text-muted-foreground">Real:</span>
+          <Badge variant="outline" className="h-5 font-mono text-[11px] tabular-nums">
+            {match.homeGoals} – {match.awayGoals}
           </Badge>
           {predictionComplete && !matchesOfficial && (
-            <span className="text-xs text-muted-foreground">Tu pronóstico difiere</span>
+            <span className="text-[11px] text-amber-400/80">Difiere</span>
           )}
         </div>
       )}

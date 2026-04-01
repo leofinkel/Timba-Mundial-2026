@@ -41,19 +41,15 @@ export const GroupStage = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/25 bg-gradient-to-r from-emerald-500/10 via-background to-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-medium text-foreground">
-          Fase de grupos
-        </p>
+      <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent px-4 py-3">
+        <p className="text-sm font-semibold text-foreground">Fase de grupos</p>
         <p className="text-sm tabular-nums text-muted-foreground">
-          <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-            {completedCount}
-          </span>
-          <span> / {GROUP_MATCHES_COUNT} partidos completados</span>
+          <span className="font-bold text-emerald-400">{completedCount}</span>
+          <span className="text-muted-foreground"> / {GROUP_MATCHES_COUNT} partidos completados</span>
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {sortedGroups.map((g) => (
           <GroupAccordion
             key={g.id}

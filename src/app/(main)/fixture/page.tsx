@@ -57,7 +57,7 @@ const FixturePage = async () => {
         aria-hidden
       />
 
-      <div className="relative mx-auto w-full max-w-5xl space-y-2">
+      <div className="relative mx-auto w-full max-w-6xl space-y-2">
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Fixture</h1>
         <p className="mt-1 text-sm text-zinc-400 sm:text-base">
           Cargá marcadores y definiciones por fase. El guardado completo se habilitará en las
@@ -65,7 +65,7 @@ const FixturePage = async () => {
         </p>
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2">
         {!user ? (
           <Badge className="border-zinc-700 bg-zinc-800/80 text-zinc-100">Modo invitado</Badge>
         ) : null}
@@ -92,7 +92,7 @@ const FixturePage = async () => {
       </div>
 
       {(deadlinePassed || isLocked) && (
-        <Card className="relative mx-auto w-full max-w-5xl border-amber-500/30 bg-amber-500/10 shadow-sm">
+        <Card className="relative mx-auto w-full max-w-6xl border-amber-500/30 bg-amber-500/10 shadow-sm">
           <CardHeader className="py-3">
             <CardTitle className="text-base text-amber-200">Importante</CardTitle>
             <CardDescription className="text-amber-100/90">
@@ -104,7 +104,7 @@ const FixturePage = async () => {
         </Card>
       )}
 
-      <Card className="relative mx-auto w-full max-w-5xl border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
+      <Card className="relative mx-auto w-full max-w-6xl border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-lg text-white">Tu planilla</CardTitle>
           <CardDescription className="text-zinc-400">

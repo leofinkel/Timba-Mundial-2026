@@ -50,15 +50,15 @@ export const GroupAccordion = ({
     <Accordion type="single" collapsible className="w-full">
       <AccordionItem
         value={group.id}
-        className="rounded-xl border border-border/80 bg-card/40 px-3 shadow-sm"
+        className="rounded-xl border border-border/60 bg-card/50 px-4 shadow-sm backdrop-blur-sm"
       >
-        <AccordionTrigger className="py-3 hover:no-underline">
-          <div className="flex w-full flex-col items-start gap-1 text-left sm:flex-row sm:items-center sm:justify-between sm:pr-2">
-            <div className="flex items-center gap-2">
-              <span className="text-base font-semibold tracking-tight">{group.name}</span>
+        <AccordionTrigger className="py-3.5 hover:no-underline">
+          <div className="flex w-full items-center justify-between pr-2">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base font-bold tracking-tight">{group.name}</span>
               <Badge
                 variant="secondary"
-                className="bg-emerald-600/15 text-emerald-200"
+                className="bg-emerald-600/15 text-xs text-emerald-300"
               >
                 {completed}/{total} partidos
               </Badge>
@@ -66,7 +66,7 @@ export const GroupAccordion = ({
           </div>
         </AccordionTrigger>
         <AccordionContent className="space-y-4 pb-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {group.matches.map((m) => {
               const p = groupPredictions[m.id];
               return (
@@ -82,37 +82,37 @@ export const GroupAccordion = ({
             })}
           </div>
 
-          <div className="rounded-lg border border-border/70 bg-muted/20 p-2">
-            <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Tabla (según tu pronóstico)
+          <div className="rounded-lg border border-border/50 bg-zinc-900/40 p-2.5">
+            <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Tabla según tu pronóstico
             </p>
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-8 w-8 px-1 text-center">Pos</TableHead>
-                  <TableHead className="h-8 px-1">Equipo</TableHead>
-                  <TableHead className="h-8 px-1 text-center">Pts</TableHead>
-                  <TableHead className="h-8 px-1 text-center">DG</TableHead>
-                  <TableHead className="h-8 px-1 text-center">GF</TableHead>
+                <TableRow className="border-border/40 hover:bg-transparent">
+                  <TableHead className="h-7 w-8 px-1 text-center text-[11px]">#</TableHead>
+                  <TableHead className="h-7 px-1 text-[11px]">Equipo</TableHead>
+                  <TableHead className="h-7 px-1 text-center text-[11px]">Pts</TableHead>
+                  <TableHead className="h-7 px-1 text-center text-[11px]">DG</TableHead>
+                  <TableHead className="h-7 px-1 text-center text-[11px]">GF</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {standings.map((row) => (
-                  <TableRow key={row.team.id} className="text-xs sm:text-sm">
-                    <TableCell className="px-1 text-center font-medium tabular-nums">
+                  <TableRow key={row.team.id} className="border-border/30 text-xs">
+                    <TableCell className="px-1 text-center font-medium tabular-nums text-muted-foreground">
                       {row.position}
                     </TableCell>
                     <TableCell className="px-1">
                       <div className="flex items-center gap-1.5">
                         <TeamFlag team={row.team} size="sm" />
-                        <span className="max-w-[100px] truncate font-medium">{row.team.name}</span>
+                        <span className="font-medium">{row.team.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="px-1 text-center tabular-nums">{row.points}</TableCell>
-                    <TableCell className="px-1 text-center tabular-nums">
+                    <TableCell className="px-1 text-center font-semibold tabular-nums">{row.points}</TableCell>
+                    <TableCell className="px-1 text-center tabular-nums text-muted-foreground">
                       {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
                     </TableCell>
-                    <TableCell className="px-1 text-center tabular-nums">{row.goalsFor}</TableCell>
+                    <TableCell className="px-1 text-center tabular-nums text-muted-foreground">{row.goalsFor}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

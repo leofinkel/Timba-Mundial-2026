@@ -37,6 +37,7 @@ export interface GroupMatch {
   awayTeam: Team;
   homeGoals: number | null;
   awayGoals: number | null;
+  playedAt: string | null;
 }
 
 export interface GroupStanding {
