@@ -87,13 +87,10 @@ export const listAllProfiles = async (
 export const countPaidProfiles = async (
   supabase: SupabaseClient,
 ): Promise<number> => {
-  const { count, error } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('payment_status', 'paid');
+  const { data, error } = await supabase.rpc('count_paid_profiles');
 
-  if (error) throw new Error(`profiles.count paid failed: ${error.message}`);
-  return count ?? 0;
+  if (error) throw new Error(`count_paid_profiles rpc failed: ${error.message}`);
+  return (data as number) ?? 0;
 };
 
 export const countAllProfiles = async (
@@ -121,6 +118,18 @@ export const updatePaymentStatus = async (
 
   if (error) throw new Error(`profiles.update payment_status failed: ${error.message}`);
   return mapRow(data as ProfileRow);
+};
+
+export const listDisplayNames = async (
+  supabase: SupabaseClient,
+): Promise<{ id: string; displayName: string }[]> => {
+  const { data, error } = await supabase.rpc('list_profile_display_names');
+
+  if (error) throw new Error(`list_profile_display_names rpc failed: ${error.message}`);
+  return ((data ?? []) as { id: string; display_name: string }[]).map((r) => ({
+    id: r.id,
+    displayName: r.display_name,
+  }));
 };
 
 export const updateProfileAvatarUrl = async (

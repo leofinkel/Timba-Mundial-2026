@@ -2,7 +2,7 @@ import 'server-only';
 
 import { ENTRY_FEE, PRIZE_DISTRIBUTION } from '@/constants/scoring';
 import { createServiceLogger } from '@/lib/logger';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerClient } from '@/lib/supabase/server';
 import * as profileRepository from '@/repositories/profileRepository';
 import * as userScoreRepository from '@/repositories/userScoreRepository';
 import type { Leaderboard, PrizePool, RankingEntry } from '@/types/ranking';
@@ -11,7 +11,7 @@ const log = createServiceLogger('rankingService');
 
 export const getPrizePool = async (): Promise<PrizePool> => {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createServerClient();
     const paidUsersCount = await profileRepository.countPaidProfiles(supabase);
     const totalPool = paidUsersCount * ENTRY_FEE;
     const prizePool: PrizePool = {
@@ -32,14 +32,14 @@ export const getPrizePool = async (): Promise<PrizePool> => {
 
 export const getLeaderboard = async (): Promise<Leaderboard> => {
   try {
-    const supabase = createAdminClient();
-    const [scores, profiles, prizePool] = await Promise.all([
+    const supabase = await createServerClient();
+    const [scores, displayNames, prizePool] = await Promise.all([
       userScoreRepository.listScoresOrderedByPoints(supabase),
-      profileRepository.listAllProfiles(supabase),
+      profileRepository.listDisplayNames(supabase),
       getPrizePool(),
     ]);
 
-    const nameByUser = new Map(profiles.map((p) => [p.id, p.displayName]));
+    const nameByUser = new Map(displayNames.map((p) => [p.id, p.displayName]));
 
     const sorted = [...scores].sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -80,7 +80,7 @@ export const getUserRank = async (
   userId: string,
 ): Promise<{ rank: number | null; totalPoints: number }> => {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createServerClient();
     const score = await userScoreRepository.getUserScoreByUserId(
       supabase,
       userId,

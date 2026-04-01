@@ -106,6 +106,7 @@ export const updatePaymentStatusAction = async (
     revalidatePath('/admin');
     revalidatePath('/dashboard');
     revalidatePath('/fixture');
+    revalidatePath('/rankings');
     revalidatePath('/perfil');
     return { success: true, data: null };
   } catch (e) {

@@ -100,13 +100,10 @@ export const upsertUserScore = async (
 export const listScoresOrderedByPoints = async (
   supabase: SupabaseClient,
 ): Promise<UserScoreBreakdown[]> => {
-  const { data, error } = await supabase
-    .from('user_scores')
-    .select('*')
-    .order('total_points', { ascending: false });
+  const { data, error } = await supabase.rpc('list_leaderboard_scores');
 
-  if (error) throw new Error(`user_scores.select ordered failed: ${error.message}`);
-  return (data as UserScoreRow[]).map(mapRow);
+  if (error) throw new Error(`list_leaderboard_scores rpc failed: ${error.message}`);
+  return ((data ?? []) as UserScoreRow[]).map(mapRow);
 };
 
 export const updateRanksBulk = async (
