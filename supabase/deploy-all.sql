@@ -76,7 +76,7 @@ CREATE TABLE public.matches (
     group_id IS NULL
     OR group_id IN ('A','B','C','D','E','F','G','H','I','J','K','L')
   ),
-  match_number INTEGER NOT NULL,
+  match_number INTEGER NOT NULL UNIQUE,
   matchday INTEGER CHECK (matchday IS NULL OR matchday BETWEEN 1 AND 3),
   home_team_id TEXT REFERENCES public.teams (id),
   away_team_id TEXT REFERENCES public.teams (id),
@@ -424,7 +424,11 @@ INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_i
   (69, 'group', 'J', 3, 'alg', 'aut', NULL, NULL, '2026-06-28 04:00:00+00'),
   (70, 'group', 'J', 3, 'jor', 'arg', NULL, NULL, '2026-06-28 04:00:00+00'),
   (71, 'group', 'K', 3, 'col', 'por', NULL, NULL, '2026-06-28 01:30:00+00'),
-  (72, 'group', 'K', 3, 'rdc', 'uzb', NULL, NULL, '2026-06-28 01:30:00+00');
+  (72, 'group', 'K', 3, 'rdc', 'uzb', NULL, NULL, '2026-06-28 01:30:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Round of 32 (16 matches)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
@@ -443,7 +447,11 @@ INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_i
   (85, 'round-of-32', NULL, NULL, NULL, NULL, '1B', '3-EFGIJ', '2026-07-03 05:00:00+00'),
   (86, 'round-of-32', NULL, NULL, NULL, NULL, '1J', '2H', '2026-07-04 00:00:00+00'),
   (87, 'round-of-32', NULL, NULL, NULL, NULL, '1K', '3-DEIJL', '2026-07-04 03:30:00+00'),
-  (88, 'round-of-32', NULL, NULL, NULL, NULL, '2D', '2G', '2026-07-03 20:00:00+00');
+  (88, 'round-of-32', NULL, NULL, NULL, NULL, '2D', '2G', '2026-07-03 20:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Round of 16 (8 matches)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
@@ -454,27 +462,47 @@ INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_i
   (93, 'round-of-16', NULL, NULL, NULL, NULL, 'W83', 'W84', '2026-07-06 21:00:00+00'),
   (94, 'round-of-16', NULL, NULL, NULL, NULL, 'W81', 'W82', '2026-07-07 02:00:00+00'),
   (95, 'round-of-16', NULL, NULL, NULL, NULL, 'W86', 'W88', '2026-07-07 18:00:00+00'),
-  (96, 'round-of-16', NULL, NULL, NULL, NULL, 'W85', 'W87', '2026-07-07 22:00:00+00');
+  (96, 'round-of-16', NULL, NULL, NULL, NULL, 'W85', 'W87', '2026-07-07 22:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Quarter-Finals (4 matches)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
   (97, 'quarter-finals', NULL, NULL, NULL, NULL, 'W89', 'W90', '2026-07-09 22:00:00+00'),
   (98, 'quarter-finals', NULL, NULL, NULL, NULL, 'W93', 'W94', '2026-07-10 21:00:00+00'),
   (99, 'quarter-finals', NULL, NULL, NULL, NULL, 'W91', 'W92', '2026-07-11 23:00:00+00'),
-  (100, 'quarter-finals', NULL, NULL, NULL, NULL, 'W95', 'W96', '2026-07-12 03:00:00+00');
+  (100, 'quarter-finals', NULL, NULL, NULL, NULL, 'W95', 'W96', '2026-07-12 03:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Semi-Finals (2 matches)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
   (101, 'semi-finals', NULL, NULL, NULL, NULL, 'W97', 'W98', '2026-07-14 21:00:00+00'),
-  (102, 'semi-finals', NULL, NULL, NULL, NULL, 'W99', 'W100', '2026-07-15 21:00:00+00');
+  (102, 'semi-finals', NULL, NULL, NULL, NULL, 'W99', 'W100', '2026-07-15 21:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Third Place (1 match)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
-  (103, 'third-place', NULL, NULL, NULL, NULL, 'RU101', 'RU102', '2026-07-18 23:00:00+00');
+  (103, 'third-place', NULL, NULL, NULL, NULL, 'RU101', 'RU102', '2026-07-18 23:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- Final (1 match)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
-  (104, 'final', NULL, NULL, NULL, NULL, 'W101', 'W102', '2026-07-19 21:00:00+00');
+  (104, 'final', NULL, NULL, NULL, NULL, 'W101', 'W102', '2026-07-19 21:00:00+00')
+ON CONFLICT (match_number) DO UPDATE SET
+  stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
+  home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
+  home_source = EXCLUDED.home_source, away_source = EXCLUDED.away_source, played_at = EXCLUDED.played_at;
 
 -- #####################################################################
 -- STEP 4: FUNCTIONS (group standings + scoring)

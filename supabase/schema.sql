@@ -76,7 +76,7 @@ CREATE TABLE public.matches (
     group_id IS NULL
     OR group_id IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
   ),
-  match_number INTEGER NOT NULL,
+  match_number INTEGER NOT NULL UNIQUE,
   matchday INTEGER CHECK (matchday IS NULL OR matchday BETWEEN 1 AND 3),
   home_team_id TEXT REFERENCES public.teams (id),
   away_team_id TEXT REFERENCES public.teams (id),
