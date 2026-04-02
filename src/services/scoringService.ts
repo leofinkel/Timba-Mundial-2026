@@ -2,6 +2,7 @@ import 'server-only';
 
 import { SCORING_RULES } from '@/constants/scoring';
 import { GROUP_NAMES } from '@/constants/tournament';
+import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import type { UserScoreBreakdown } from '@/types/scoring';
@@ -190,6 +191,13 @@ const standingsOrderForGroup = (
   matches: MatchRow[],
 ): string[] => {
   const table = new Map<string, TeamAcc>();
+  const groupMatchScores: {
+    homeTeamId: string;
+    awayTeamId: string;
+    homeGoals: number;
+    awayGoals: number;
+  }[] = [];
+
   for (const m of matches) {
     if (m.stage !== 'group' || m.group_id !== groupId) {
       continue;
@@ -203,27 +211,22 @@ const standingsOrderForGroup = (
       continue;
     }
     bumpTable(table, m.home_team_id, m.away_team_id, m.home_goals, m.away_goals);
+    groupMatchScores.push({
+      homeTeamId: m.home_team_id,
+      awayTeamId: m.away_team_id,
+      homeGoals: m.home_goals,
+      awayGoals: m.away_goals,
+    });
   }
 
-  const rows = [...table.values()].sort((a, b) => {
-    if (b.pts !== a.pts) {
-      return b.pts - a.pts;
-    }
-    const gdA = a.gf - a.ga;
-    const gdB = b.gf - b.ga;
-    if (gdB !== gdA) {
-      return gdB - gdA;
-    }
-    if (b.gf !== a.gf) {
-      return b.gf - a.gf;
-    }
-    if (b.won !== a.won) {
-      return b.won - a.won;
-    }
-    return a.teamId.localeCompare(b.teamId);
-  });
+  const overallRows = [...table.values()].map((r) => ({
+    teamId: r.teamId,
+    points: r.pts,
+    goalsFor: r.gf,
+    goalsAgainst: r.ga,
+  }));
 
-  return rows.map((r) => r.teamId);
+  return orderGroupStandings(overallRows, groupMatchScores).order;
 };
 
 const computeForPrediction = (params: {

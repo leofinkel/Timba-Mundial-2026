@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 
+import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+
 import {
   Accordion,
   AccordionContent,
@@ -9,6 +11,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -26,6 +29,8 @@ type GroupAccordionProps = {
   group: Group;
   groupPredictions: GroupPredictionState;
   standings: GroupStanding[];
+  unresolvedTieClusters: string[][];
+  onMoveTeamInGroupOrder: (teamId: string, direction: 'up' | 'down') => void;
   onGroupMatchUpdate: (matchId: string, home: number | null, away: number | null) => void;
   disabled?: boolean;
 };
@@ -34,6 +39,8 @@ export const GroupAccordion = ({
   group,
   groupPredictions,
   standings,
+  unresolvedTieClusters,
+  onMoveTeamInGroupOrder,
   onGroupMatchUpdate,
   disabled = false,
 }: GroupAccordionProps) => {
@@ -45,6 +52,30 @@ export const GroupAccordion = ({
     }
     return { completed: c, total: group.matches.length };
   }, [group.matches, groupPredictions]);
+
+  const hasUnresolvedTies = unresolvedTieClusters.length > 0;
+
+  const clusterMoveHints = useMemo(() => {
+    const map = new Map<
+      string,
+      { canUp: boolean; canDown: boolean }
+    >();
+    for (const cluster of unresolvedTieClusters) {
+      const indices = cluster
+        .map((id) => standings.findIndex((s) => s.team.id === id))
+        .filter((i) => i >= 0)
+        .sort((a, b) => a - b);
+      for (let k = 0; k < indices.length; k += 1) {
+        const row = standings[indices[k]];
+        if (!row) continue;
+        map.set(row.team.id, {
+          canUp: k > 0,
+          canDown: k < indices.length - 1,
+        });
+      }
+    }
+    return map;
+  }, [standings, unresolvedTieClusters]);
 
   return (
     <Accordion type="single" collapsible className="w-full">
@@ -86,6 +117,16 @@ export const GroupAccordion = ({
             <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Tabla según tu pronóstico
             </p>
+            {hasUnresolvedTies ? (
+              <div className="mb-3 flex gap-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-100">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden />
+                <p>
+                  Hay equipos empatados en puntos, diferencia de goles, goles a favor y criterios
+                  entre ellos. Usá las flechas para definir el orden dentro del grupo y guardá la
+                  predicción.
+                </p>
+              </div>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow className="border-border/40 hover:bg-transparent">
@@ -93,8 +134,13 @@ export const GroupAccordion = ({
                   <TableHead className="h-7 px-1 text-[11px]">Equipo</TableHead>
                   <TableHead className="h-7 px-1 text-center text-[11px]">Pts</TableHead>
                   <TableHead className="h-7 px-1 text-center text-[11px]">DG</TableHead>
-                  <TableHead className="h-7 px-1 text-center text-[11px]">GF</TableHead>
-                </TableRow>
+                <TableHead className="h-7 px-1 text-center text-[11px]">GF</TableHead>
+                {hasUnresolvedTies ? (
+                  <TableHead className="h-7 w-[72px] px-0 text-center text-[11px]">
+                    Orden
+                  </TableHead>
+                ) : null}
+              </TableRow>
               </TableHeader>
               <TableBody>
                 {standings.map((row) => (
@@ -113,6 +159,42 @@ export const GroupAccordion = ({
                       {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
                     </TableCell>
                     <TableCell className="px-1 text-center tabular-nums text-muted-foreground">{row.goalsFor}</TableCell>
+                    {hasUnresolvedTies ? (
+                      <TableCell className="px-0 py-1">
+                        {(() => {
+                          const hint = clusterMoveHints.get(row.team.id);
+                          if (!hint) {
+                            return <span className="text-muted-foreground/40">—</span>;
+                          }
+                          return (
+                            <div className="flex justify-center gap-0.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                disabled={disabled || !hint.canUp}
+                                onClick={() => onMoveTeamInGroupOrder(row.team.id, 'up')}
+                                aria-label={`Subir ${row.team.name} en la tabla`}
+                              >
+                                <ChevronUp className="size-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                disabled={disabled || !hint.canDown}
+                                onClick={() => onMoveTeamInGroupOrder(row.team.id, 'down')}
+                                aria-label={`Bajar ${row.team.name} en la tabla`}
+                              >
+                                <ChevronDown className="size-4" />
+                              </Button>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

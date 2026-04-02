@@ -39,6 +39,8 @@ export const FixturePredictionTabs = ({
     updateKnockoutMatch,
     updateSpecial,
     calculatedStandings,
+    groupStandingsTieInfo,
+    moveTeamInGroupOrder,
     save,
     isSaving,
     errors,
@@ -104,6 +106,8 @@ export const FixturePredictionTabs = ({
             groups={tournament.groups}
             groupPredictions={groupPredictions}
             calculatedStandings={calculatedStandings}
+            groupStandingsTieInfo={groupStandingsTieInfo}
+            onMoveTeamInGroupOrder={moveTeamInGroupOrder}
             onGroupMatchUpdate={updateGroupMatch}
             disabled={saveDisabled || isSaving}
           />

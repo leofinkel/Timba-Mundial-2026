@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { savePredictionsAction } from '@/actions/predictions';
 import {
   computeGroupStandingsFromPredictions,
+  reorderStandingsByTeamOrder,
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import {
@@ -209,13 +210,79 @@ export const useFixturePredictions = ({
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<string | null>(null);
 
-  const calculatedStandings = useMemo(() => {
-    const out = {} as Record<GroupName, ReturnType<typeof computeGroupStandingsFromPredictions>>;
+  const initManualGroupOrder = (): Partial<Record<GroupName, string[]>> => {
+    const pgs = initialPrediction?.predictedGroupStandings;
+    if (!pgs) return {};
+    if (pgs instanceof Map) {
+      return Object.fromEntries(pgs) as Partial<Record<GroupName, string[]>>;
+    }
+    if (typeof pgs === 'object' && pgs !== null) {
+      return pgs as Partial<Record<GroupName, string[]>>;
+    }
+    return {};
+  };
+
+  const [manualGroupOrder, setManualGroupOrder] =
+    useState<Partial<Record<GroupName, string[]>>>(initManualGroupOrder);
+
+  const rawGroupStandings = useMemo(() => {
+    const out = {} as Record<
+      GroupName,
+      ReturnType<typeof computeGroupStandingsFromPredictions>
+    >;
     for (const g of tournament.groups) {
       out[g.id] = computeGroupStandingsFromPredictions(g.teams, g.matches, groupPredictions);
     }
     return out;
   }, [tournament.groups, groupPredictions]);
+
+  const isValidTeamOrder = (order: string[] | undefined, groupTeamIds: string[]): boolean => {
+    if (!order || order.length !== groupTeamIds.length) return false;
+    const set = new Set(order);
+    if (set.size !== order.length) return false;
+    return groupTeamIds.every((id) => set.has(id));
+  };
+
+  useEffect(() => {
+    setManualGroupOrder((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of tournament.groups) {
+        if (rawGroupStandings[g.id].unresolvedTieClusters.length === 0 && next[g.id]) {
+          delete next[g.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [rawGroupStandings, tournament.groups]);
+
+  const calculatedStandings = useMemo(() => {
+    const out = {} as Record<GroupName, GroupStanding[]>;
+    for (const g of tournament.groups) {
+      const raw = rawGroupStandings[g.id];
+      const teamIds = g.teams.map((t) => t.id);
+      const manual = manualGroupOrder[g.id];
+      if (raw.unresolvedTieClusters.length === 0) {
+        out[g.id] = raw.standings;
+      } else if (isValidTeamOrder(manual, teamIds)) {
+        out[g.id] = reorderStandingsByTeamOrder(raw.standings, manual!);
+      } else {
+        out[g.id] = raw.standings;
+      }
+    }
+    return out;
+  }, [rawGroupStandings, manualGroupOrder, tournament.groups]);
+
+  const groupStandingsTieInfo = useMemo(() => {
+    const out = {} as Record<GroupName, { unresolvedTieClusters: string[][] }>;
+    for (const g of tournament.groups) {
+      out[g.id] = {
+        unresolvedTieClusters: rawGroupStandings[g.id].unresolvedTieClusters,
+      };
+    }
+    return out;
+  }, [rawGroupStandings, tournament.groups]);
 
   const winnerSourceMap = useMemo(
     () => buildWinnerSourceMap(tournament.knockoutMatches),
@@ -259,6 +326,44 @@ export const useFixturePredictions = ({
       return changed ? next : prev;
     });
   }, [calculatedStandings, tournament.knockoutMatches]);
+
+  const moveTeamInGroupOrder = useCallback(
+    (groupId: GroupName, teamId: string, direction: 'up' | 'down') => {
+      if (isLocked) return;
+      const g = tournament.groups.find((x) => x.id === groupId);
+      if (!g) return;
+      const raw = rawGroupStandings[groupId];
+      const cluster = raw.unresolvedTieClusters.find((c) => c.includes(teamId));
+      if (!cluster) return;
+
+      const teamIds = g.teams.map((t) => t.id);
+      const baseOrder =
+        isValidTeamOrder(manualGroupOrder[groupId], teamIds) && manualGroupOrder[groupId]
+          ? [...manualGroupOrder[groupId]!]
+          : raw.standings.map((s) => s.team.id);
+
+      const indices = cluster
+        .map((id) => baseOrder.indexOf(id))
+        .filter((i) => i >= 0)
+        .sort((a, b) => a - b);
+      const myIdx = baseOrder.indexOf(teamId);
+      const posInCluster = indices.indexOf(myIdx);
+      if (posInCluster < 0) return;
+
+      if (direction === 'up' && posInCluster > 0) {
+        const swapIdx = indices[posInCluster - 1];
+        const next = [...baseOrder];
+        [next[myIdx], next[swapIdx]] = [next[swapIdx], next[myIdx]];
+        setManualGroupOrder((prev) => ({ ...prev, [groupId]: next }));
+      } else if (direction === 'down' && posInCluster < indices.length - 1) {
+        const swapIdx = indices[posInCluster + 1];
+        const next = [...baseOrder];
+        [next[myIdx], next[swapIdx]] = [next[swapIdx], next[myIdx]];
+        setManualGroupOrder((prev) => ({ ...prev, [groupId]: next }));
+      }
+    },
+    [isLocked, tournament.groups, rawGroupStandings, manualGroupOrder],
+  );
 
   const cascadeWinner = useCallback(
     (
@@ -384,11 +489,23 @@ export const useFixturePredictions = ({
           };
         });
 
+      const groupStandingsByGroup = tournament.groups.reduce(
+        (acc, g) => {
+          const rows = calculatedStandings[g.id];
+          if (rows?.length) {
+            acc[g.id] = rows.map((s) => s.team.id);
+          }
+          return acc;
+        },
+        {} as Record<GroupName, string[]>,
+      );
+
       const result = await savePredictionsAction({
         groupPredictions: groupPredictionsPayload,
         knockoutPredictions:
           knockoutPredictionsPayload.length > 0 ? knockoutPredictionsPayload : undefined,
         specialPredictions: { topScorer: top, bestPlayer: best },
+        groupStandingsByGroup,
       });
 
       if (!result.success) {
@@ -405,6 +522,7 @@ export const useFixturePredictions = ({
     specialPredictions,
     tournament.groups,
     tournament.knockoutMatches,
+    calculatedStandings,
   ]);
 
   return {
@@ -415,6 +533,8 @@ export const useFixturePredictions = ({
     updateKnockoutMatch,
     updateSpecial,
     calculatedStandings,
+    groupStandingsTieInfo,
+    moveTeamInGroupOrder,
     save,
     isSaving,
     errors,

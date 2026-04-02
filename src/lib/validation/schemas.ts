@@ -44,6 +44,8 @@ export const savePredictionsSchema = z.object({
     topScorer: specialPredictionNameSchema,
     bestPlayer: specialPredictionNameSchema,
   }),
+  /** Orden 1–4 por grupo (IDs de equipo); se guarda con la tabla mostrada al usuario. */
+  groupStandingsByGroup: z.record(z.string(), z.array(z.string().min(1))).optional(),
 });
 
 export const saveSpecialPredictionsSchema = z.object({

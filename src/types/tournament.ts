@@ -53,6 +53,13 @@ export interface GroupStanding {
   position: 1 | 2 | 3 | 4;
 }
 
+/** Resultado del cálculo de tabla con desempates y empates no resueltos (orden manual). */
+export type ComputedGroupStandings = {
+  standings: GroupStanding[];
+  /** Equipos empatados en puntos, DG, GF y criterios entre sí; requieren orden manual. */
+  unresolvedTieClusters: string[][];
+};
+
 export interface Group {
   id: GroupName;
   name: string;

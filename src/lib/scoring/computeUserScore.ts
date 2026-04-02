@@ -1,4 +1,5 @@
 import { SCORING_RULES } from '@/constants/scoring';
+import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
 import type { MatchRow } from '@/repositories/matchRepository';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { GroupName } from '@/types/tournament';
@@ -92,17 +93,34 @@ const tallyGroup = (groupId: GroupName, matches: MatchRow[]) => {
 
 const sortTeamsByTable = (
   stats: Record<string, { gf: number; ga: number; pts: number; mp: number }>,
+  groupMatches: MatchRow[],
+  groupId: GroupName,
 ): string[] => {
-  return Object.keys(stats).sort((ta, tb) => {
-    const a = stats[ta];
-    const b = stats[tb];
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    const gdA = a.gf - a.ga;
-    const gdB = b.gf - b.ga;
-    if (gdB !== gdA) return gdB - gdA;
-    if (b.gf !== a.gf) return b.gf - a.gf;
-    return ta.localeCompare(tb);
-  });
+  const matchScores: {
+    homeTeamId: string;
+    awayTeamId: string;
+    homeGoals: number;
+    awayGoals: number;
+  }[] = [];
+  for (const m of groupMatches) {
+    if (m.group_id !== groupId) continue;
+    if (m.home_goals == null || m.away_goals == null || !m.home_team_id || !m.away_team_id) {
+      continue;
+    }
+    matchScores.push({
+      homeTeamId: m.home_team_id,
+      awayTeamId: m.away_team_id,
+      homeGoals: m.home_goals,
+      awayGoals: m.away_goals,
+    });
+  }
+  const overallRows = Object.keys(stats).map((teamId) => ({
+    teamId,
+    points: stats[teamId].pts,
+    goalsFor: stats[teamId].gf,
+    goalsAgainst: stats[teamId].ga,
+  }));
+  return orderGroupStandings(overallRows, matchScores).order;
 };
 
 export const computeActualGroupPositions = (
@@ -124,7 +142,7 @@ export const computeActualGroupPositions = (
       continue;
     }
     const stats = tallyGroup(gid, ms);
-    const order = sortTeamsByTable(stats);
+    const order = sortTeamsByTable(stats, ms, gid);
     const pos = new Map<string, number>();
     order.forEach((tid, idx) => pos.set(tid, idx + 1));
     result.set(gid, pos);

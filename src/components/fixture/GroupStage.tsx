@@ -8,10 +8,14 @@ import type { Group, GroupName, GroupStanding } from '@/types/tournament';
 
 import { GroupAccordion } from '@/components/fixture/GroupAccordion';
 
+type GroupStandingsTieInfo = Record<GroupName, { unresolvedTieClusters: string[][] }>;
+
 type GroupStageProps = {
   groups: Group[];
   groupPredictions: GroupPredictionState;
   calculatedStandings: Record<GroupName, GroupStanding[]>;
+  groupStandingsTieInfo: GroupStandingsTieInfo;
+  onMoveTeamInGroupOrder: (groupId: GroupName, teamId: string, direction: 'up' | 'down') => void;
   onGroupMatchUpdate: (matchId: string, home: number | null, away: number | null) => void;
   disabled?: boolean;
 };
@@ -20,6 +24,8 @@ export const GroupStage = ({
   groups,
   groupPredictions,
   calculatedStandings,
+  groupStandingsTieInfo,
+  onMoveTeamInGroupOrder,
   onGroupMatchUpdate,
   disabled = false,
 }: GroupStageProps) => {
@@ -56,6 +62,10 @@ export const GroupStage = ({
             group={g}
             groupPredictions={groupPredictions}
             standings={calculatedStandings[g.id] ?? []}
+            unresolvedTieClusters={groupStandingsTieInfo[g.id]?.unresolvedTieClusters ?? []}
+            onMoveTeamInGroupOrder={(teamId, direction) =>
+              onMoveTeamInGroupOrder(g.id, teamId, direction)
+            }
             onGroupMatchUpdate={onGroupMatchUpdate}
             disabled={disabled}
           />
