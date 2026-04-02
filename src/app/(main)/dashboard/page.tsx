@@ -198,19 +198,23 @@ const DashboardPage = async () => {
             {Math.round(PRIZE_DISTRIBUTION.third * 100)}%
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-xs uppercase text-zinc-400">Pozo total</p>
-            <p className="text-2xl font-bold text-emerald-300">{formatARS(prizePool.totalPool)}</p>
-            <p className="text-xs text-zinc-400">{prizePool.paidUsersCount} jugadores habilitados</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-300">{formatARS(prizePool.totalPool)}</p>
+            <p className="mt-0.5 text-xs text-zinc-400">{prizePool.paidUsersCount} jugadores habilitados</p>
           </div>
           <div>
             <p className="text-xs uppercase text-zinc-400">1.er premio</p>
-            <p className="text-xl font-semibold text-white">{formatARS(prizePool.firstPrize)}</p>
+            <p className="mt-1 text-xl font-semibold text-white">{formatARS(prizePool.firstPrize)}</p>
           </div>
           <div>
             <p className="text-xs uppercase text-zinc-400">2.º premio</p>
-            <p className="text-xl font-semibold text-white">{formatARS(prizePool.secondPrize)}</p>
+            <p className="mt-1 text-xl font-semibold text-white">{formatARS(prizePool.secondPrize)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-zinc-400">3.er premio</p>
+            <p className="mt-1 text-xl font-semibold text-white">{formatARS(prizePool.thirdPrize)}</p>
           </div>
         </CardContent>
       </Card>
