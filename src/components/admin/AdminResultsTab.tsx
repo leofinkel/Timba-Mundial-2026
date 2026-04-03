@@ -64,10 +64,10 @@ export const AdminResultsTab = ({
   const [winnerOverride, setWinnerOverride] = useState(UNSET);
   const [pendingMatch, startMatchTransition] = useTransition();
 
-  const [championTeamId, setChampionTeamId] = useState(teams[0]?.id ?? '');
-  const [runnerUpTeamId, setRunnerUpTeamId] = useState(teams[1]?.id ?? teams[0]?.id ?? '');
-  const [thirdPlaceTeamId, setThirdPlaceTeamId] = useState(teams[2]?.id ?? teams[0]?.id ?? '');
-  const [fourthPlaceTeamId, setFourthPlaceTeamId] = useState(teams[3]?.id ?? teams[0]?.id ?? '');
+  const [championTeamId, setChampionTeamId] = useState(UNSET);
+  const [runnerUpTeamId, setRunnerUpTeamId] = useState(UNSET);
+  const [thirdPlaceTeamId, setThirdPlaceTeamId] = useState(UNSET);
+  const [fourthPlaceTeamId, setFourthPlaceTeamId] = useState(UNSET);
   const [topScorer, setTopScorer] = useState('');
   const [bestPlayer, setBestPlayer] = useState('');
   const [pendingSpecial, startSpecialTransition] = useTransition();
@@ -173,7 +173,12 @@ export const AdminResultsTab = ({
       toast.error('Completá goleador y mejor jugador');
       return;
     }
-    if (!championTeamId || !runnerUpTeamId || !thirdPlaceTeamId || !fourthPlaceTeamId) {
+    if (
+      championTeamId === UNSET ||
+      runnerUpTeamId === UNSET ||
+      thirdPlaceTeamId === UNSET ||
+      fourthPlaceTeamId === UNSET
+    ) {
       toast.error('Seleccioná las cuatro selecciones');
       return;
     }
@@ -351,10 +356,13 @@ export const AdminResultsTab = ({
               <Label>Campeón</Label>
               <Select value={championTeamId} onValueChange={setChampionTeamId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar…" />
                 </SelectTrigger>
                 <SelectContent>
                   <ScrollArea className="h-[min(50vh,280px)]">
+                    <SelectItem value={UNSET} disabled>
+                      Seleccionar…
+                    </SelectItem>
                     {teams.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -368,10 +376,13 @@ export const AdminResultsTab = ({
               <Label>Subcampeón</Label>
               <Select value={runnerUpTeamId} onValueChange={setRunnerUpTeamId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar…" />
                 </SelectTrigger>
                 <SelectContent>
                   <ScrollArea className="h-[min(50vh,280px)]">
+                    <SelectItem value={UNSET} disabled>
+                      Seleccionar…
+                    </SelectItem>
                     {teams.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -385,10 +396,13 @@ export const AdminResultsTab = ({
               <Label>3.er puesto</Label>
               <Select value={thirdPlaceTeamId} onValueChange={setThirdPlaceTeamId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar…" />
                 </SelectTrigger>
                 <SelectContent>
                   <ScrollArea className="h-[min(50vh,280px)]">
+                    <SelectItem value={UNSET} disabled>
+                      Seleccionar…
+                    </SelectItem>
                     {teams.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
@@ -402,10 +416,13 @@ export const AdminResultsTab = ({
               <Label>4.º puesto</Label>
               <Select value={fourthPlaceTeamId} onValueChange={setFourthPlaceTeamId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccionar…" />
                 </SelectTrigger>
                 <SelectContent>
                   <ScrollArea className="h-[min(50vh,280px)]">
+                    <SelectItem value={UNSET} disabled>
+                      Seleccionar…
+                    </SelectItem>
                     {teams.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
