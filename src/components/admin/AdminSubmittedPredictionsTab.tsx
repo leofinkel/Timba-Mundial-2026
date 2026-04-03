@@ -2,12 +2,23 @@
 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye } from 'lucide-react';
+import { Eye, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
+import { deleteUserPredictionAsAdminAction } from '@/actions/admin';
 import { OtherUserPredictionsDialog } from '@/components/rankings/OtherUserPredictionsDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -36,14 +47,45 @@ export const AdminSubmittedPredictionsTab = ({
   users,
   tournament,
 }: AdminSubmittedPredictionsTabProps) => {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<AdminSubmittedPredictionUser | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<AdminSubmittedPredictionUser | null>(null);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deletePending, setDeletePending] = useState(false);
+
+  const resetDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeleteStep(1);
+    setDeletePending(false);
+  };
+
+  const handleDeleteConfirmFinal = async () => {
+    if (!deleteTarget) return;
+    setDeletePending(true);
+    const res = await deleteUserPredictionAsAdminAction(deleteTarget.userId);
+    setDeletePending(false);
+    if (res.success) {
+      const removedUserId = deleteTarget.userId;
+      toast.success('Pronóstico eliminado.');
+      resetDeleteDialog();
+      if (target?.userId === removedUserId) {
+        setOpen(false);
+        setTarget(null);
+      }
+      router.refresh();
+      return;
+    }
+    toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
+  };
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">
         Jugadores que guardaron su planilla al menos una vez. Podés abrir la vista de solo lectura de
-        sus pronósticos en cualquier momento.
+        sus pronósticos en cualquier momento. Como admin podés borrar una planilla (doble
+        confirmación).
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-zinc-800/80">
@@ -53,7 +95,7 @@ export const AdminSubmittedPredictionsTab = ({
               <TableHead>Jugador</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Último guardado</TableHead>
-              <TableHead className="text-right">Planilla</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -86,19 +128,34 @@ export const AdminSubmittedPredictionsTab = ({
                     {format(parseISO(u.updatedAt), "d MMM yyyy, HH:mm", { locale: es })}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-zinc-600"
-                      onClick={() => {
-                        setTarget(u);
-                        setOpen(true);
-                      }}
-                    >
-                      <Eye className="mr-1 size-4" aria-hidden />
-                      Ver
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-zinc-600"
+                        onClick={() => {
+                          setTarget(u);
+                          setOpen(true);
+                        }}
+                      >
+                        <Eye className="mr-1 size-4" aria-hidden />
+                        Ver
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-red-900/80 text-red-300 hover:bg-red-950/40 hover:text-red-200"
+                        onClick={() => {
+                          setDeleteTarget(u);
+                          setDeleteStep(1);
+                        }}
+                      >
+                        <Trash2 className="mr-1 size-4" aria-hidden />
+                        Borrar
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -106,6 +163,75 @@ export const AdminSubmittedPredictionsTab = ({
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) resetDeleteDialog();
+        }}
+      >
+        <DialogContent className="border-zinc-800/80 bg-zinc-950 text-zinc-50 sm:max-w-md">
+          {deleteStep === 1 ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-white">¿Borrar pronóstico?</DialogTitle>
+                <DialogDescription className="text-zinc-400">
+                  Vas a borrar la planilla guardada de{' '}
+                  <span className="font-medium text-zinc-200">{deleteTarget?.displayName}</span>. Para
+                  continuar se pedirá una segunda confirmación.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-zinc-600"
+                  onClick={resetDeleteDialog}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-red-700 text-white hover:bg-red-600"
+                  onClick={() => setDeleteStep(2)}
+                >
+                  Continuar
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-white">Confirmación final</DialogTitle>
+                <DialogDescription className="text-zinc-400">
+                  Se eliminarán todos los datos del pronóstico de{' '}
+                  <span className="font-medium text-zinc-200">{deleteTarget?.displayName}</span>{' '}
+                  (partidos, posiciones y especiales). Esta acción no se puede deshacer.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-zinc-600"
+                  onClick={() => setDeleteStep(1)}
+                  disabled={deletePending}
+                >
+                  Volver
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-red-700 text-white hover:bg-red-600"
+                  disabled={deletePending}
+                  onClick={() => void handleDeleteConfirmFinal()}
+                >
+                  {deletePending ? 'Borrando…' : 'Borrar definitivamente'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <OtherUserPredictionsDialog
         open={open}

@@ -20,8 +20,8 @@ export const registerSchema = z
 
 export const groupMatchPredictionSchema = z.object({
   matchId: z.string().min(1),
-  homeGoals: z.number().int().min(0).max(99),
-  awayGoals: z.number().int().min(0).max(99),
+  homeGoals: z.number().int().min(0).max(99).nullable(),
+  awayGoals: z.number().int().min(0).max(99).nullable(),
 });
 
 export const knockoutMatchPredictionSchema = z.object({

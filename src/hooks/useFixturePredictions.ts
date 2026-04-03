@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { savePredictionsAction } from '@/actions/predictions';
 import {
@@ -9,7 +9,6 @@ import {
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import {
-  buildRoundOf32Allocation,
   resolveDirectSource,
   THIRD_PLACE_SLOTS,
   rankThirdPlaceTeams,
@@ -21,7 +20,74 @@ import type {
   SpecialPrediction,
   UserPrediction,
 } from '@/types/prediction';
+import { KNOCKOUT_ROUNDS } from '@/constants/tournament';
 import type { GroupName, GroupStanding, KnockoutMatch, Tournament } from '@/types/tournament';
+
+const KNOCKOUT_ROUND_SORT_INDEX = new Map(
+  KNOCKOUT_ROUNDS.map((r, i) => [r.id, i] as const),
+);
+
+const sortKnockoutMatchesForPropagation = (matches: KnockoutMatch[]): KnockoutMatch[] =>
+  [...matches].sort((a, b) => {
+    const ia = KNOCKOUT_ROUND_SORT_INDEX.get(a.round) ?? 0;
+    const ib = KNOCKOUT_ROUND_SORT_INDEX.get(b.round) ?? 0;
+    if (ia !== ib) return ia - ib;
+    return a.matchNumber - b.matchNumber;
+  });
+
+/**
+ * Propagates a match winner (and loser for RU slots) to subsequent bracket matches.
+ * Must match the behaviour of interactive picks so reload restores full bracket slots.
+ */
+const cascadeKnockoutWinnerState = (
+  state: Record<string, KnockoutMatchPrediction>,
+  matchId: string,
+  winnerSourceMap: Map<string, Array<{ matchId: string; side: 'home' | 'away' }>>,
+): Record<string, KnockoutMatchPrediction> => {
+  const pred = state[matchId];
+  if (!pred?.winnerId) return state;
+
+  const targets = winnerSourceMap.get(matchId) ?? [];
+  let next = state;
+
+  for (const t of targets) {
+    const target = next[t.matchId];
+    if (!target) continue;
+
+    const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
+    if (target[teamKey] !== pred.winnerId) {
+      if (next === state) next = { ...state };
+      let winnerId = target.winnerId;
+      if (
+        winnerId &&
+        winnerId !== (t.side === 'home' ? pred.winnerId : target.homeTeamId) &&
+        winnerId !== (t.side === 'away' ? pred.winnerId : target.awayTeamId)
+      ) {
+        winnerId = '';
+      }
+      next[t.matchId] = { ...target, [teamKey]: pred.winnerId, winnerId };
+      next = cascadeKnockoutWinnerState(next, t.matchId, winnerSourceMap);
+    }
+  }
+
+  const loserTargets = winnerSourceMap.get(`RU:${matchId}`) ?? [];
+  const loserId =
+    pred.homeTeamId === pred.winnerId ? pred.awayTeamId : pred.homeTeamId;
+
+  if (loserId) {
+    for (const t of loserTargets) {
+      const target = next[t.matchId];
+      if (!target) continue;
+      const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
+      if (target[teamKey] !== loserId) {
+        if (next === state) next = { ...state };
+        next[t.matchId] = { ...target, [teamKey]: loserId };
+      }
+    }
+  }
+
+  return next;
+};
 
 export type UseFixturePredictionsArgs = {
   tournament: Tournament;
@@ -30,6 +96,49 @@ export type UseFixturePredictionsArgs = {
 };
 
 export type GroupPredictionState = GroupMatchScoresInput;
+
+/** True when every group match has a valid predicted score (required before deriving R32 from standings). */
+const isGroupStagePredictionComplete = (
+  groups: Tournament['groups'],
+  predictions: GroupMatchScoresInput,
+): boolean => {
+  for (const g of groups) {
+    for (const m of g.matches) {
+      const p = predictions[m.id];
+      if (!p || p.homeGoals === null || p.awayGoals === null) return false;
+      const hg = p.homeGoals;
+      const ag = p.awayGoals;
+      if (!Number.isFinite(hg) || !Number.isFinite(ag) || hg < 0 || ag < 0) return false;
+    }
+  }
+  return true;
+};
+
+/** Strip user-predicted teams; keep only slots fixed by the tournament (official results in DB). */
+const clearKnockoutToOfficialOnly = (
+  matches: KnockoutMatch[],
+  prev: Record<string, KnockoutMatchPrediction>,
+): Record<string, KnockoutMatchPrediction> => {
+  let changed = false;
+  const next = { ...prev };
+  for (const m of matches) {
+    const cur = next[m.id];
+    if (!cur) continue;
+    const home = m.homeTeam?.id ?? '';
+    const away = m.awayTeam?.id ?? '';
+    let winnerId = cur.winnerId;
+    if (!home || !away) {
+      winnerId = '';
+    } else if (winnerId && winnerId !== home && winnerId !== away) {
+      winnerId = '';
+    }
+    if (cur.homeTeamId !== home || cur.awayTeamId !== away || cur.winnerId !== winnerId) {
+      changed = true;
+      next[m.id] = { ...cur, homeTeamId: home, awayTeamId: away, winnerId };
+    }
+  }
+  return changed ? next : prev;
+};
 
 const buildGroupPredictionState = (
   groups: Tournament['groups'],
@@ -289,11 +398,16 @@ export const useFixturePredictions = ({
     [tournament.knockoutMatches],
   );
 
-  const isInitialMount = useRef(true);
+  const isGroupStageComplete = useMemo(
+    () => isGroupStagePredictionComplete(tournament.groups, groupPredictions),
+    [tournament.groups, groupPredictions],
+  );
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
+    if (!isGroupStageComplete) {
+      setKnockoutPredictions((prev) =>
+        clearKnockoutToOfficialOnly(tournament.knockoutMatches, prev),
+      );
       return;
     }
 
@@ -303,7 +417,7 @@ export const useFixturePredictions = ({
     );
 
     setKnockoutPredictions((prev) => {
-      const next = { ...prev };
+      let next = { ...prev };
       let changed = false;
 
       for (const [matchId, teams] of Object.entries(r32Teams)) {
@@ -323,9 +437,24 @@ export const useFixturePredictions = ({
         }
       }
 
+      const ordered = sortKnockoutMatchesForPropagation(tournament.knockoutMatches);
+      for (const m of ordered) {
+        if (!next[m.id]?.winnerId) continue;
+        const propagated = cascadeKnockoutWinnerState(next, m.id, winnerSourceMap);
+        if (propagated !== next) {
+          next = propagated;
+          changed = true;
+        }
+      }
+
       return changed ? next : prev;
     });
-  }, [calculatedStandings, tournament.knockoutMatches]);
+  }, [
+    isGroupStageComplete,
+    calculatedStandings,
+    tournament.knockoutMatches,
+    winnerSourceMap,
+  ]);
 
   const moveTeamInGroupOrder = useCallback(
     (groupId: GroupName, teamId: string, direction: 'up' | 'down') => {
@@ -369,53 +498,8 @@ export const useFixturePredictions = ({
     (
       state: Record<string, KnockoutMatchPrediction>,
       matchId: string,
-    ): Record<string, KnockoutMatchPrediction> => {
-      const pred = state[matchId];
-      if (!pred?.winnerId) return state;
-
-      const targets = winnerSourceMap.get(matchId) ?? [];
-      let next = state;
-
-      for (const t of targets) {
-        const target = next[t.matchId];
-        if (!target) continue;
-
-        const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
-        if (target[teamKey] !== pred.winnerId) {
-          if (next === state) next = { ...state };
-          let winnerId = target.winnerId;
-          if (
-            winnerId &&
-            winnerId !== (t.side === 'home' ? pred.winnerId : target.homeTeamId) &&
-            winnerId !== (t.side === 'away' ? pred.winnerId : target.awayTeamId)
-          ) {
-            winnerId = '';
-          }
-          next[t.matchId] = { ...target, [teamKey]: pred.winnerId, winnerId };
-          next = cascadeWinner(next, t.matchId);
-        }
-      }
-
-      const loserTargets = winnerSourceMap.get(`RU:${matchId}`) ?? [];
-      const loserId =
-        pred.homeTeamId === pred.winnerId
-          ? pred.awayTeamId
-          : pred.homeTeamId;
-
-      if (loserId) {
-        for (const t of loserTargets) {
-          const target = next[t.matchId];
-          if (!target) continue;
-          const teamKey = t.side === 'home' ? 'homeTeamId' : 'awayTeamId';
-          if (target[teamKey] !== loserId) {
-            if (next === state) next = { ...state };
-            next[t.matchId] = { ...target, [teamKey]: loserId };
-          }
-        }
-      }
-
-      return next;
-    },
+    ): Record<string, KnockoutMatchPrediction> =>
+      cascadeKnockoutWinnerState(state, matchId, winnerSourceMap),
     [winnerSourceMap],
   );
 
@@ -465,13 +549,13 @@ export const useFixturePredictions = ({
     setIsSaving(true);
     setErrors(null);
     try {
-      const groupPredictionsPayload: GroupMatchPrediction[] = tournament.groups.flatMap((g) =>
+      const groupPredictionsPayload = tournament.groups.flatMap((g) =>
         g.matches.map((m) => {
           const p = groupPredictions[m.id];
           return {
             matchId: m.id,
-            homeGoals: p?.homeGoals ?? 0,
-            awayGoals: p?.awayGoals ?? 0,
+            homeGoals: p?.homeGoals ?? null,
+            awayGoals: p?.awayGoals ?? null,
           };
         }),
       );

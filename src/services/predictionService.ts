@@ -203,6 +203,34 @@ export const getUserPredictionForAdmin = async (
   }
 };
 
+export const deleteUserPredictionForAdmin = async (
+  adminUserId: string,
+  targetUserId: string,
+): Promise<{ deleted: boolean }> => {
+  try {
+    const supabase = await createServerClient();
+    const admin = await profileRepository.hasAdminRole(supabase, adminUserId);
+    if (!admin) {
+      log.warn({ adminUserId }, 'deleteUserPredictionForAdmin: not admin');
+      throw new Error('Forbidden');
+    }
+    const deleted = await predictionRepository.deletePredictionByUserId(
+      supabase,
+      targetUserId,
+    );
+    if (deleted) {
+      log.info({ adminUserId, targetUserId }, 'deleteUserPredictionForAdmin');
+    } else {
+      log.warn({ adminUserId, targetUserId }, 'deleteUserPredictionForAdmin: no row');
+    }
+    return { deleted };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ adminUserId, targetUserId, err: message }, 'deleteUserPredictionForAdmin failed');
+    throw err instanceof Error ? err : new Error('deleteUserPredictionForAdmin failed');
+  }
+};
+
 export const savePredictions = async (
   userId: string,
   data: SavePredictionsPayload,
@@ -232,13 +260,26 @@ export const savePredictions = async (
     const pred = await predictionRepository.upsertPredictionRow(supabase, userId);
 
     for (const g of data.groupPredictions) {
-      await predictionRepository.upsertPredictionMatch(supabase, {
-        prediction_id: pred.id,
-        match_id: g.matchId,
-        home_goals: g.homeGoals,
-        away_goals: g.awayGoals,
-        winner_team_id: null,
-      });
+      const hg = g.homeGoals;
+      const ag = g.awayGoals;
+      if (
+        hg !== null &&
+        ag !== null &&
+        Number.isFinite(hg) &&
+        Number.isFinite(ag) &&
+        hg >= 0 &&
+        ag >= 0
+      ) {
+        await predictionRepository.upsertPredictionMatch(supabase, {
+          prediction_id: pred.id,
+          match_id: g.matchId,
+          home_goals: hg,
+          away_goals: ag,
+          winner_team_id: null,
+        });
+      } else {
+        await predictionRepository.deletePredictionMatch(supabase, pred.id, g.matchId);
+      }
     }
 
     const ko = data.knockoutPredictions ?? [];

@@ -36,6 +36,21 @@ export const getPredictionByUserId = async (
   return data as PredictionRow | null;
 };
 
+/** Elimina la fila `predictions` y dependencias (CASCADE). Devuelve si había fila. */
+export const deletePredictionByUserId = async (
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('predictions')
+    .delete()
+    .eq('user_id', userId)
+    .select('id');
+
+  if (error) throw new Error(`predictions.delete by user failed: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+};
+
 export const upsertPredictionRow = async (
   supabase: SupabaseClient,
   userId: string,
@@ -214,6 +229,20 @@ export const upsertPredictionMatch = async (
   );
 
   if (error) throw new Error(`prediction_matches.upsert failed: ${error.message}`);
+};
+
+export const deletePredictionMatch = async (
+  supabase: SupabaseClient,
+  predictionId: string,
+  matchId: string,
+): Promise<void> => {
+  const { error } = await supabase
+    .from('prediction_matches')
+    .delete()
+    .eq('prediction_id', predictionId)
+    .eq('match_id', matchId);
+
+  if (error) throw new Error(`prediction_matches.delete failed: ${error.message}`);
 };
 
 export const replaceGroupStandings = async (

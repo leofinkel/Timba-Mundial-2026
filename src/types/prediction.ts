@@ -6,6 +6,13 @@ export interface GroupMatchPrediction {
   awayGoals: number;
 }
 
+/** Payload de guardado: partidos sin cargar van con goles en null (no se persiste 0-0 por defecto). */
+export type SaveGroupMatchPrediction = {
+  matchId: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+};
+
 export interface KnockoutMatchPrediction {
   matchId: string;
   homeTeamId: string;
@@ -47,7 +54,7 @@ export type PredictionStatus = 'draft' | 'submitted' | 'locked';
 
 /** Payload for persisting a user's full prediction sheet (service layer). */
 export type SavePredictionsPayload = {
-  groupPredictions: GroupMatchPrediction[];
+  groupPredictions: SaveGroupMatchPrediction[];
   knockoutPredictions?: KnockoutMatchPrediction[];
   specialPredictions: SpecialPrediction;
   /** When set, replaces predicted group positions in DB (1 = index 0 … 4 = index 3). */
