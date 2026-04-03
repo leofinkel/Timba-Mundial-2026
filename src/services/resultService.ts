@@ -110,6 +110,33 @@ export const saveMatchResult = async (
   }
 };
 
+/** Admin-only: clear an entered result (goals, winner, played_at). */
+export const clearMatchResult = async (matchId: string, adminId: string): Promise<void> => {
+  const admin = await isAdmin(adminId);
+  if (!admin) {
+    log.warn({ adminId, matchId }, 'clearMatchResult denied');
+    throw new Error('Only admins can clear match results');
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from('matches')
+    .update({
+      home_goals: null,
+      away_goals: null,
+      winner_team_id: null,
+      played_at: null,
+    })
+    .eq('id', matchId);
+
+  if (error) {
+    log.error({ err: error, matchId }, 'clearMatchResult update failed');
+    throw new Error(error.message);
+  }
+
+  log.info({ matchId, adminId }, 'Match result cleared');
+};
+
 /** Admin-only: set the winner of a knockout match (no scores) and advance. */
 export const saveKnockoutWinner = async (
   matchId: string,

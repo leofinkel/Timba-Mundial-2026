@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS public.prediction_specials CASCADE;
 DROP TABLE IF EXISTS public.predictions CASCADE;
 DROP TABLE IF EXISTS public.user_scores CASCADE;
 DROP TABLE IF EXISTS public.real_results CASCADE;
+DROP TABLE IF EXISTS public.real_group_standings CASCADE;
 DROP TABLE IF EXISTS public.matches CASCADE;
 DROP TABLE IF EXISTS public.teams CASCADE;
 DROP TABLE IF EXISTS public.game_rules CASCADE;

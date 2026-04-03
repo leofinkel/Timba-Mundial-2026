@@ -22,7 +22,7 @@ import type { MatchRow } from '@/repositories/matchRepository';
 import type { AdminClassificationEntry, AdminGameRule, AdminSubmittedPredictionUser } from '@/types/admin';
 import type { UserProfile } from '@/types/auth';
 import type { NewsPost } from '@/types/news';
-import type { Tournament } from '@/types/tournament';
+import type { GroupName, Tournament } from '@/types/tournament';
 import { ChevronDown } from 'lucide-react';
 
 interface MatchOption {
@@ -59,6 +59,7 @@ interface AdminDashboardPanelProps {
   submittedPredictionUsers: AdminSubmittedPredictionUser[];
   tournament: Tournament;
   news: NewsPost[];
+  groupStandingOverrides: Partial<Record<GroupName, string[]>>;
 }
 
 export const AdminDashboardPanel = ({
@@ -72,6 +73,7 @@ export const AdminDashboardPanel = ({
   submittedPredictionUsers,
   tournament,
   news,
+  groupStandingOverrides,
 }: AdminDashboardPanelProps) => {
   const [activeTab, setActiveTab] = useState('payments');
   const isAbmSelected =
@@ -152,7 +154,12 @@ export const AdminDashboardPanel = ({
         <AdminPaymentsTab users={users} />
       </TabsContent>
       <TabsContent value="results" className="mt-6">
-        <AdminResultsTab matchOptions={matchOptions} teams={teams} />
+        <AdminResultsTab
+          matchOptions={matchOptions}
+          teams={teams}
+          tournament={tournament}
+          groupStandingOverrides={groupStandingOverrides}
+        />
       </TabsContent>
       <TabsContent value="rules" className="mt-6">
         <AdminRulesTab rules={rules} />

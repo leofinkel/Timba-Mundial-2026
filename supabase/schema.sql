@@ -200,6 +200,23 @@ CREATE TABLE public.real_results (
 COMMENT ON TABLE public.real_results IS 'Canonical FIFA-style special results (champion, awards); used to score specials and finals.';
 
 -- -----------------------------------------------------------------------------
+-- real_group_standings: optional admin override for final 1–4 order per group.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.real_group_standings (
+  group_id TEXT NOT NULL CHECK (
+    group_id IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
+  ),
+  team_id TEXT NOT NULL REFERENCES public.teams (id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 4),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, team_id),
+  UNIQUE (group_id, position)
+);
+
+COMMENT ON TABLE public.real_group_standings IS
+  'When a group has 4 rows, public.group_standings uses these positions instead of computed order.';
+
+-- -----------------------------------------------------------------------------
 -- news_posts: admin-published announcements shown on the landing/dashboard.
 -- -----------------------------------------------------------------------------
 CREATE TABLE public.news_posts (
@@ -244,6 +261,8 @@ CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_poin
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
+
+CREATE INDEX idx_real_group_standings_group_id ON public.real_group_standings (group_id);
 
 -- =============================================================================
 -- SECTION: updated_at trigger
@@ -376,6 +395,7 @@ ALTER TABLE public.prediction_group_standings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prediction_specials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.real_group_standings ENABLE ROW LEVEL SECURITY;
 
 -- -----------------------------------------------------------------------------
 -- profiles
@@ -526,6 +546,22 @@ CREATE POLICY "real_results_select_authenticated"
 
 CREATE POLICY "real_results_write_admin"
   ON public.real_results
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- -----------------------------------------------------------------------------
+-- real_group_standings: authenticated read; admin write
+-- -----------------------------------------------------------------------------
+CREATE POLICY "real_group_standings_select_authenticated"
+  ON public.real_group_standings
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "real_group_standings_write_admin"
+  ON public.real_group_standings
   FOR ALL
   TO authenticated
   USING (public.is_admin())

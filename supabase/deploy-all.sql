@@ -17,6 +17,7 @@ DROP TABLE IF EXISTS public.prediction_specials CASCADE;
 DROP TABLE IF EXISTS public.predictions CASCADE;
 DROP TABLE IF EXISTS public.user_scores CASCADE;
 DROP TABLE IF EXISTS public.real_results CASCADE;
+DROP TABLE IF EXISTS public.real_group_standings CASCADE;
 DROP TABLE IF EXISTS public.matches CASCADE;
 DROP TABLE IF EXISTS public.teams CASCADE;
 DROP TABLE IF EXISTS public.game_rules CASCADE;
@@ -173,6 +174,17 @@ CREATE TABLE public.real_results (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE public.real_group_standings (
+  group_id TEXT NOT NULL CHECK (
+    group_id IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
+  ),
+  team_id TEXT NOT NULL REFERENCES public.teams (id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 4),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, team_id),
+  UNIQUE (group_id, position)
+);
+
 CREATE TABLE public.news_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -201,6 +213,7 @@ CREATE INDEX idx_prediction_specials_prediction_id ON public.prediction_specials
 CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_points DESC NULLS LAST);
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
+CREATE INDEX idx_real_group_standings_group_id ON public.real_group_standings (group_id);
 
 -- updated_at trigger
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -257,6 +270,7 @@ ALTER TABLE public.prediction_group_standings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prediction_specials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.real_group_standings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.news_posts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "profiles_select_own_or_admin" ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid() OR public.is_admin());
@@ -287,6 +301,9 @@ CREATE POLICY "user_scores_write_admin" ON public.user_scores FOR ALL TO authent
 
 CREATE POLICY "real_results_select_authenticated" ON public.real_results FOR SELECT TO authenticated USING (true);
 CREATE POLICY "real_results_write_admin" ON public.real_results FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+CREATE POLICY "real_group_standings_select_authenticated" ON public.real_group_standings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "real_group_standings_write_admin" ON public.real_group_standings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 CREATE POLICY "news_posts_select_public" ON public.news_posts FOR SELECT USING (true);
 CREATE POLICY "news_posts_write_admin" ON public.news_posts FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
@@ -554,7 +571,7 @@ ON CONFLICT (match_number) DO UPDATE SET
 -- STEP 4: FUNCTIONS (group standings + scoring)
 -- #####################################################################
 
--- Group standings view (live table from real match results)
+-- Group standings view (live table from real match results + optional admin override)
 CREATE OR REPLACE VIEW public.group_standings AS
 WITH team_matches AS (
   SELECT
@@ -571,43 +588,73 @@ WITH team_matches AS (
     AND (m.home_team_id = t.id OR m.away_team_id = t.id)
     AND m.home_goals IS NOT NULL
     AND m.away_goals IS NOT NULL
+),
+computed AS (
+  SELECT
+    t.group_id,
+    t.id AS team_id,
+    t.name AS team_name,
+    t.code AS team_code,
+    COALESCE(s.played, 0)::INTEGER AS played,
+    COALESCE(s.won, 0)::INTEGER AS won,
+    COALESCE(s.drawn, 0)::INTEGER AS drawn,
+    COALESCE(s.lost, 0)::INTEGER AS lost,
+    COALESCE(s.goals_for, 0)::INTEGER AS goals_for,
+    COALESCE(s.goals_against, 0)::INTEGER AS goals_against,
+    (COALESCE(s.goals_for, 0) - COALESCE(s.goals_against, 0))::INTEGER AS goal_difference,
+    (COALESCE(s.won, 0) * 3 + COALESCE(s.drawn, 0))::INTEGER AS points,
+    ROW_NUMBER() OVER (
+      PARTITION BY t.group_id
+      ORDER BY
+        (COALESCE(s.won, 0) * 3 + COALESCE(s.drawn, 0)) DESC,
+        (COALESCE(s.goals_for, 0) - COALESCE(s.goals_against, 0)) DESC,
+        COALESCE(s.goals_for, 0) DESC,
+        t.name ASC
+    )::INTEGER AS computed_position
+  FROM public.teams t
+  LEFT JOIN (
+    SELECT
+      tm.team_id,
+      COUNT(*)::INTEGER AS played,
+      COUNT(*) FILTER (WHERE tm.goals_for > tm.goals_against)::INTEGER AS won,
+      COUNT(*) FILTER (WHERE tm.goals_for = tm.goals_against)::INTEGER AS drawn,
+      COUNT(*) FILTER (WHERE tm.goals_for < tm.goals_against)::INTEGER AS lost,
+      SUM(tm.goals_for)::INTEGER AS goals_for,
+      SUM(tm.goals_against)::INTEGER AS goals_against
+    FROM team_matches tm
+    GROUP BY tm.team_id
+  ) s ON s.team_id = t.id
+  WHERE t.group_id IS NOT NULL
+),
+active_override AS (
+  SELECT rgs.group_id
+  FROM public.real_group_standings rgs
+  GROUP BY rgs.group_id
+  HAVING COUNT(*) = 4
 )
 SELECT
-  t.group_id,
-  t.id AS team_id,
-  t.name AS team_name,
-  t.code AS team_code,
-  COALESCE(s.played, 0)::INTEGER AS played,
-  COALESCE(s.won, 0)::INTEGER AS won,
-  COALESCE(s.drawn, 0)::INTEGER AS drawn,
-  COALESCE(s.lost, 0)::INTEGER AS lost,
-  COALESCE(s.goals_for, 0)::INTEGER AS goals_for,
-  COALESCE(s.goals_against, 0)::INTEGER AS goals_against,
-  (COALESCE(s.goals_for, 0) - COALESCE(s.goals_against, 0))::INTEGER AS goal_difference,
-  (COALESCE(s.won, 0) * 3 + COALESCE(s.drawn, 0))::INTEGER AS points,
-  ROW_NUMBER() OVER (
-    PARTITION BY t.group_id
-    ORDER BY
-      (COALESCE(s.won, 0) * 3 + COALESCE(s.drawn, 0)) DESC,
-      (COALESCE(s.goals_for, 0) - COALESCE(s.goals_against, 0)) DESC,
-      COALESCE(s.goals_for, 0) DESC,
-      t.name ASC
-  )::INTEGER AS position
-FROM public.teams t
-LEFT JOIN (
-  SELECT
-    tm.team_id,
-    COUNT(*)::INTEGER AS played,
-    COUNT(*) FILTER (WHERE tm.goals_for > tm.goals_against)::INTEGER AS won,
-    COUNT(*) FILTER (WHERE tm.goals_for = tm.goals_against)::INTEGER AS drawn,
-    COUNT(*) FILTER (WHERE tm.goals_for < tm.goals_against)::INTEGER AS lost,
-    SUM(tm.goals_for)::INTEGER AS goals_for,
-    SUM(tm.goals_against)::INTEGER AS goals_against
-  FROM team_matches tm
-  GROUP BY tm.team_id
-) s ON s.team_id = t.id
-WHERE t.group_id IS NOT NULL
-ORDER BY t.group_id, position;
+  c.group_id,
+  c.team_id,
+  c.team_name,
+  c.team_code,
+  c.played,
+  c.won,
+  c.drawn,
+  c.lost,
+  c.goals_for,
+  c.goals_against,
+  c.goal_difference,
+  c.points,
+  CASE
+    WHEN a.group_id IS NOT NULL AND r.position IS NOT NULL THEN r.position
+    ELSE c.computed_position
+  END AS position
+FROM computed c
+LEFT JOIN active_override a ON a.group_id = c.group_id
+LEFT JOIN public.real_group_standings r
+  ON r.group_id = c.group_id
+  AND r.team_id = c.team_id
+ORDER BY c.group_id, position;
 
 -- Prediction group standings function
 CREATE OR REPLACE FUNCTION public.get_prediction_group_standings(p_prediction_id UUID)

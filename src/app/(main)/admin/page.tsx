@@ -12,6 +12,7 @@ import {
 } from '@/services/adminService';
 import { getTournament } from '@/services/fixtureService';
 import { listPublicNews } from '@/services/newsService';
+import { listRealGroupStandingsGrouped } from '@/services/realGroupStandingsService';
 
 const AdminPage = async () => {
   const userResult = await getCurrentUser();
@@ -22,17 +23,27 @@ const AdminPage = async () => {
     redirect('/dashboard');
   }
 
-  const [usersRes, statsRes, matches, rules, classification, submittedPredictionUsers, tournament, news] =
-    await Promise.all([
-      getAllUsersAction(),
-      getAdminDashboardAction(),
-      listAllMatchesForAdmin(),
-      listGameRulesForAdmin(),
-      listClassificationForAdmin(),
-      listSubmittedPredictionsForAdmin(),
-      getTournament(),
-      listPublicNews(),
-    ]);
+  const [
+    usersRes,
+    statsRes,
+    matches,
+    rules,
+    classification,
+    submittedPredictionUsers,
+    tournament,
+    news,
+    groupStandingOverrides,
+  ] = await Promise.all([
+    getAllUsersAction(),
+    getAdminDashboardAction(),
+    listAllMatchesForAdmin(),
+    listGameRulesForAdmin(),
+    listClassificationForAdmin(),
+    listSubmittedPredictionsForAdmin(),
+    getTournament(),
+    listPublicNews(),
+    listRealGroupStandingsGrouped(),
+  ]);
 
   if (!usersRes.success || !usersRes.data) {
     redirect('/dashboard');
@@ -82,6 +93,7 @@ const AdminPage = async () => {
         submittedPredictionUsers={submittedPredictionUsers}
         tournament={tournament}
         news={news}
+        groupStandingOverrides={groupStandingOverrides}
       />
     </div>
   );

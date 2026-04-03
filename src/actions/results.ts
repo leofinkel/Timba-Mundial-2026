@@ -4,14 +4,27 @@ import { revalidatePath } from 'next/cache';
 
 import { createServerClient } from '@/lib/supabase/server';
 import {
+  adminGroupStandingsClearSchema,
+  adminGroupStandingsOverrideSchema,
   adminResultSchema,
+  clearMatchResultSchema,
   knockoutResultSchema,
   saveSpecialResultsSchema,
 } from '@/lib/validation/schemas';
 import type { SaveSpecialResultsSchemaInferred } from '@/lib/validation/schemas';
 import { isAdmin } from '@/services/adminService';
-import { saveKnockoutWinner, saveMatchResult, saveSpecialResults } from '@/services/resultService';
+import {
+  clearMatchResult,
+  saveKnockoutWinner,
+  saveMatchResult,
+  saveSpecialResults,
+} from '@/services/resultService';
+import {
+  clearRealGroupStandingsOverrideWithAuth,
+  saveRealGroupStandingsOverrideWithAuth,
+} from '@/services/realGroupStandingsService';
 import { calculateAllScores } from '@/services/scoringService';
+import type { GroupName } from '@/types/tournament';
 
 const formatZodIssues = (issues: { message: string }[]) =>
   issues.map((i) => i.message).join(', ');
@@ -59,6 +72,109 @@ export const saveMatchResultAction = async (
       winnerOverride,
     );
 
+    await calculateAllScores();
+    revalidateAll();
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const clearMatchResultAction = async (
+  matchId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const admin = await isAdmin(user.id);
+    if (!admin) return { success: false, error: 'Forbidden' };
+
+    const parsed = clearMatchResultSchema.safeParse({ matchId });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: formatZodIssues(parsed.error.issues) || 'Invalid input',
+      };
+    }
+
+    await clearMatchResult(parsed.data.matchId, user.id);
+    await calculateAllScores();
+    revalidateAll();
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const saveGroupStandingsOverrideAction = async (
+  groupId: GroupName,
+  teamIds: string[],
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const admin = await isAdmin(user.id);
+    if (!admin) return { success: false, error: 'Forbidden' };
+
+    const parsed = adminGroupStandingsOverrideSchema.safeParse({ groupId, teamIds });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: formatZodIssues(parsed.error.issues) || 'Invalid input',
+      };
+    }
+
+    await saveRealGroupStandingsOverrideWithAuth(user.id, parsed.data.groupId, parsed.data.teamIds);
+    await calculateAllScores();
+    revalidateAll();
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const clearGroupStandingsOverrideAction = async (
+  groupId: GroupName,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const admin = await isAdmin(user.id);
+    if (!admin) return { success: false, error: 'Forbidden' };
+
+    const parsed = adminGroupStandingsClearSchema.safeParse({ groupId });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: formatZodIssues(parsed.error.issues) || 'Invalid input',
+      };
+    }
+
+    await clearRealGroupStandingsOverrideWithAuth(user.id, parsed.data.groupId);
     await calculateAllScores();
     revalidateAll();
     return { success: true, data: null };

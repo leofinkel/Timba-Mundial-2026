@@ -1,9 +1,16 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import { saveMatchResultAction, saveKnockoutWinnerAction, saveSpecialResultsAction } from '@/actions/results';
+import {
+  clearMatchResultAction,
+  saveKnockoutWinnerAction,
+  saveMatchResultAction,
+  saveSpecialResultsAction,
+} from '@/actions/results';
+import { AdminGroupStandingsOverrideCard } from '@/components/admin/AdminGroupStandingsOverrideCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { GroupName, Tournament } from '@/types/tournament';
 
 interface MatchOption {
   id: string;
@@ -37,11 +45,19 @@ interface TeamOption {
 interface AdminResultsTabProps {
   matchOptions: MatchOption[];
   teams: TeamOption[];
+  tournament: Tournament;
+  groupStandingOverrides: Partial<Record<GroupName, string[]>>;
 }
 
 const UNSET = '__unset__';
 
-export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) => {
+export const AdminResultsTab = ({
+  matchOptions,
+  teams,
+  tournament,
+  groupStandingOverrides,
+}: AdminResultsTabProps) => {
+  const router = useRouter();
   const [matchId, setMatchId] = useState(matchOptions[0]?.id ?? '');
   const [homeGoals, setHomeGoals] = useState('0');
   const [awayGoals, setAwayGoals] = useState('0');
@@ -61,7 +77,28 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
     [matchOptions, matchId],
   );
 
+  useEffect(() => {
+    const m = matchOptions.find((x) => x.id === matchId);
+    if (!m) return;
+    setHomeGoals(m.homeGoals != null ? String(m.homeGoals) : '0');
+    setAwayGoals(m.awayGoals != null ? String(m.awayGoals) : '0');
+    if (m.stage !== 'group' && m.homeTeamId && m.awayTeamId) {
+      if (m.winnerTeamId && (m.winnerTeamId === m.homeTeamId || m.winnerTeamId === m.awayTeamId)) {
+        setWinnerOverride(m.winnerTeamId);
+      } else {
+        setWinnerOverride(UNSET);
+      }
+    } else {
+      setWinnerOverride(UNSET);
+    }
+  }, [matchId, matchOptions]);
+
   const isKnockout = selected ? selected.stage !== 'group' : false;
+  const hasStoredResult =
+    !!selected &&
+    (selected.homeGoals != null ||
+      selected.awayGoals != null ||
+      (selected.stage !== 'group' && selected.winnerTeamId != null));
   const isDraw =
     homeGoals !== '' &&
     awayGoals !== '' &&
@@ -95,6 +132,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
         return;
       }
       toast.success('Resultado guardado — equipos avanzados automáticamente');
+      router.refresh();
     });
   };
 
@@ -110,6 +148,23 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
         return;
       }
       toast.success('Ganador guardado — equipo avanzado automáticamente');
+      router.refresh();
+    });
+  };
+
+  const clearResult = () => {
+    if (!matchId) return;
+    startMatchTransition(async () => {
+      const res = await clearMatchResultAction(matchId);
+      if (!res.success) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('Resultado borrado');
+      setHomeGoals('0');
+      setAwayGoals('0');
+      setWinnerOverride(UNSET);
+      router.refresh();
     });
   };
 
@@ -136,6 +191,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
         return;
       }
       toast.success('Resultados especiales guardados');
+      router.refresh();
     });
   };
 
@@ -227,7 +283,7 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
             </div>
           ) : null}
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
               type="button"
               className="bg-emerald-600 text-white hover:bg-emerald-600/90"
@@ -235,6 +291,14 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
               onClick={submitMatch}
             >
               Guardar resultado
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pendingMatch || !hasStoredResult}
+              onClick={clearResult}
+            >
+              Borrar resultado
             </Button>
 
             {isKnockout && knockoutTeams.length === 2 ? (
@@ -270,6 +334,11 @@ export const AdminResultsTab = ({ matchOptions, teams }: AdminResultsTabProps) =
           </div>
         </CardContent>
       </Card>
+
+      <AdminGroupStandingsOverrideCard
+        tournament={tournament}
+        initialOverrides={groupStandingOverrides}
+      />
 
       <Card className="border-zinc-800/80 shadow-md">
         <CardHeader>
