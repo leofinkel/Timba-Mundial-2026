@@ -84,6 +84,7 @@ const AdminPage = async () => {
 
       <AdminDashboardPanel
         users={usersRes.data}
+        currentAdminId={userResult.data.id}
         matchOptions={matchOptions}
         teams={teams}
         stats={statsRes.data}

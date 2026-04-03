@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createServiceLogger } from '@/lib/logger';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerClient } from '@/lib/supabase/server';
 import * as gameRuleRepository from '@/repositories/gameRuleRepository';
 import * as matchRepository from '@/repositories/matchRepository';
@@ -19,6 +20,9 @@ import type {
 import type { PaymentStatus, UserProfile } from '@/types/auth';
 
 const log = createServiceLogger('adminService');
+
+/** ~100 years; Supabase uses ban_duration on auth.users */
+const AUTH_BAN_DURATION_PERMANENT = '876000h' as const;
 
 const assertAdmin = async (adminId: string) => {
   const supabase = await createServerClient();
@@ -70,6 +74,67 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
     log.error({ userId, err: message }, 'isAdmin failed');
     throw new Error(`isAdmin failed: ${message}`);
   }
+};
+
+export const banUserWithAuth = async (
+  targetUserId: string,
+  adminId: string,
+): Promise<void> => {
+  await assertAdmin(adminId);
+  const supabase = await createServerClient();
+  const target = await profileRepository.getProfileById(supabase, targetUserId);
+  if (!target) throw new Error('Usuario no encontrado');
+  if (targetUserId === adminId) throw new Error('No podés suspender tu propia cuenta');
+  if (target.role === 'admin') throw new Error('No se puede suspender a otro administrador');
+  if (target.accountStatus === 'banned') throw new Error('El usuario ya está suspendido');
+
+  await profileRepository.updateAccountStatus(supabase, targetUserId, 'banned');
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    ban_duration: AUTH_BAN_DURATION_PERMANENT,
+  });
+  if (error) {
+    await profileRepository.updateAccountStatus(supabase, targetUserId, 'active');
+    throw new Error(error.message);
+  }
+  log.info({ targetUserId, adminId }, 'banUserWithAuth');
+};
+
+export const unbanUserWithAuth = async (
+  targetUserId: string,
+  adminId: string,
+): Promise<void> => {
+  await assertAdmin(adminId);
+  const supabase = await createServerClient();
+  const target = await profileRepository.getProfileById(supabase, targetUserId);
+  if (!target) throw new Error('Usuario no encontrado');
+  if (target.role === 'admin') throw new Error('Operación no aplicable');
+  if (target.accountStatus !== 'banned') throw new Error('El usuario no está suspendido');
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    ban_duration: 'none',
+  });
+  if (error) throw new Error(error.message);
+  await profileRepository.updateAccountStatus(supabase, targetUserId, 'active');
+  log.info({ targetUserId, adminId }, 'unbanUserWithAuth');
+};
+
+export const deleteUserWithAuth = async (
+  targetUserId: string,
+  adminId: string,
+): Promise<void> => {
+  await assertAdmin(adminId);
+  const supabase = await createServerClient();
+  const target = await profileRepository.getProfileById(supabase, targetUserId);
+  if (!target) throw new Error('Usuario no encontrado');
+  if (targetUserId === adminId) throw new Error('No podés eliminar tu propia cuenta');
+  if (target.role === 'admin') throw new Error('No se puede eliminar a otro administrador');
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.deleteUser(targetUserId);
+  if (error) throw new Error(error.message);
+  log.info({ targetUserId, adminId }, 'deleteUserWithAuth');
 };
 
 export type DashboardStats = {

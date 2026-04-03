@@ -65,10 +65,15 @@ export const getLeaderboard = async (): Promise<Leaderboard> => {
 
     const nameByUser = new Map(leaderboardProfiles.map((p) => [p.id, p.displayName]));
     const avatarByUser = new Map(leaderboardProfiles.map((p) => [p.id, p.avatarUrl]));
+    const activeProfileIds = new Set(leaderboardProfiles.map((p) => p.id));
 
     const scoreByUserId = new Map(scores.map((s) => [s.userId, s]));
-    const combined: UserScoreBreakdown[] = [...scores];
+    const combined: UserScoreBreakdown[] = [];
+    for (const s of scores) {
+      if (activeProfileIds.has(s.userId)) combined.push(s);
+    }
     for (const uid of submittedUserIds) {
+      if (!activeProfileIds.has(uid)) continue;
       if (!scoreByUserId.has(uid)) {
         combined.push(zeroBreakdown(uid));
       }

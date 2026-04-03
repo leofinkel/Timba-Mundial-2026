@@ -11,17 +11,20 @@ import {
   targetUserIdSchema,
 } from '@/lib/validation/schemas';
 import {
+  banUserWithAuth,
   createGameRuleWithAuth,
   createMatchWithAuth,
   deleteClassificationWithAuth,
   deleteGameRuleWithAuth,
   deleteMatchWithAuth,
+  deleteUserWithAuth,
   getAllUsers,
   getDashboardStats,
   isAdmin,
   listClassificationForAdmin,
   listGameRulesForAdmin,
   listAllMatchesForAdmin,
+  unbanUserWithAuth,
   updateGameRuleWithAuth,
   updateMatchWithAuth,
   updatePaymentStatus,
@@ -67,6 +70,92 @@ export const getAllUsersAction = async (): Promise<
 
     const users = await getAllUsers();
     return { success: true, data: users };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const banUserAction = async (
+  targetUserId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    await banUserWithAuth(parsed.data, user.id);
+    revalidatePath('/admin');
+    revalidatePath('/');
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const unbanUserAction = async (
+  targetUserId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    await unbanUserWithAuth(parsed.data, user.id);
+    revalidatePath('/admin');
+    revalidatePath('/');
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const deleteUserAction = async (
+  targetUserId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    await deleteUserWithAuth(parsed.data, user.id);
+    revalidatePath('/admin');
+    revalidatePath('/');
+    revalidatePath('/dashboard');
+    revalidatePath('/rankings');
+    return { success: true, data: null };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     return { success: false, error: message };

@@ -2,7 +2,12 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { PaymentStatus, UserProfile, UserRole } from '@/types/auth';
+import type {
+  AccountStatus,
+  PaymentStatus,
+  UserProfile,
+  UserRole,
+} from '@/types/auth';
 
 type ProfileRow = {
   id: string;
@@ -11,6 +16,7 @@ type ProfileRow = {
   avatar_url: string | null;
   role: string;
   payment_status: string;
+  account_status: string;
   created_at: string;
   updated_at: string;
 };
@@ -22,6 +28,7 @@ const mapRow = (row: ProfileRow): UserProfile => ({
   avatarUrl: row.avatar_url,
   role: row.role as UserRole,
   paymentStatus: row.payment_status as PaymentStatus,
+  accountStatus: (row.account_status as AccountStatus) ?? 'active',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -98,10 +105,27 @@ export const countAllProfiles = async (
 ): Promise<number> => {
   const { count, error } = await supabase
     .from('profiles')
-    .select('*', { count: 'exact', head: true });
+    .select('*', { count: 'exact', head: true })
+    .eq('account_status', 'active');
 
   if (error) throw new Error(`profiles.count all failed: ${error.message}`);
   return count ?? 0;
+};
+
+export const updateAccountStatus = async (
+  supabase: SupabaseClient,
+  userId: string,
+  status: AccountStatus,
+): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ account_status: status })
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`profiles.update account_status failed: ${error.message}`);
+  return mapRow(data as ProfileRow);
 };
 
 export const updatePaymentStatus = async (

@@ -2,8 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { loginAction } from '@/actions/auth';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { GAME_RULES_BRIEF_LINES } from '@/constants/gameRulesBrief';
 import { loginSchema, type LoginSchemaInferred } from '@/lib/validation/schemas';
+
+const SuspendedAccountNotice = () => {
+  const searchParams = useSearchParams();
+  if (searchParams.get('cuenta') !== 'suspendida') return null;
+  return (
+    <p
+      role="status"
+      className="rounded-md border border-amber-500/40 bg-amber-950/40 px-3 py-2 text-sm text-amber-100"
+    >
+      Tu cuenta fue suspendida. Si creés que es un error, contactá al organizador.
+    </p>
+  );
+};
 
 const LoginPage = () => {
   const router = useRouter();
@@ -69,6 +82,9 @@ const LoginPage = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <Suspense fallback={null}>
+                <SuspendedAccountNotice />
+              </Suspense>
               {serverError ? (
                 <p
                   role="alert"

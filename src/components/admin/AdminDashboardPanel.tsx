@@ -50,6 +50,8 @@ interface DashboardStatsPayload {
 
 interface AdminDashboardPanelProps {
   users: UserProfile[];
+  /** Logged-in admin; used to disable self-service moderation actions. */
+  currentAdminId: string;
   matchOptions: MatchOption[];
   teams: TeamOption[];
   stats: DashboardStatsPayload;
@@ -64,6 +66,7 @@ interface AdminDashboardPanelProps {
 
 export const AdminDashboardPanel = ({
   users,
+  currentAdminId,
   matchOptions,
   teams,
   stats,
@@ -151,7 +154,7 @@ export const AdminDashboardPanel = ({
         </TabsTrigger>
       </TabsList>
       <TabsContent value="payments" className="mt-6">
-        <AdminPaymentsTab users={users} />
+        <AdminPaymentsTab users={users} currentAdminId={currentAdminId} />
       </TabsContent>
       <TabsContent value="results" className="mt-6">
         <AdminResultsTab

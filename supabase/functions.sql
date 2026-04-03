@@ -713,11 +713,13 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT count(*)::integer FROM public.profiles WHERE payment_status = 'paid';
+  SELECT count(*)::integer
+  FROM public.profiles
+  WHERE payment_status = 'paid' AND account_status = 'active';
 $$;
 
 COMMENT ON FUNCTION public.count_paid_profiles() IS
-  'Returns the number of profiles with payment_status = paid. SECURITY DEFINER bypasses RLS so any authenticated user can call it.';
+  'Paid profiles with active account (excludes banned). SECURITY DEFINER bypasses RLS so any authenticated user can call it.';
 
 CREATE OR REPLACE FUNCTION public.list_profile_display_names()
 RETURNS TABLE(id UUID, display_name TEXT)
@@ -726,11 +728,14 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT p.id, p.display_name FROM public.profiles p ORDER BY p.created_at;
+  SELECT p.id, p.display_name
+  FROM public.profiles p
+  WHERE p.account_status = 'active'
+  ORDER BY p.created_at;
 $$;
 
 COMMENT ON FUNCTION public.list_profile_display_names() IS
-  'Returns id + display_name for all profiles. SECURITY DEFINER bypasses RLS for public leaderboard.';
+  'Returns id + display_name for active profiles. SECURITY DEFINER bypasses RLS for public leaderboard.';
 
 CREATE OR REPLACE FUNCTION public.list_leaderboard_scores()
 RETURNS TABLE(
@@ -781,11 +786,12 @@ SET search_path = public
 AS $$
   SELECT p.id, p.display_name, p.avatar_url
   FROM public.profiles p
+  WHERE p.account_status = 'active'
   ORDER BY p.created_at;
 $$;
 
 COMMENT ON FUNCTION public.list_profiles_for_public_leaderboard() IS
-  'Display names and avatars for leaderboard. SECURITY DEFINER bypasses RLS.';
+  'Display names and avatars for active users on leaderboard. SECURITY DEFINER bypasses RLS.';
 
 CREATE OR REPLACE FUNCTION public.list_submitted_prediction_user_ids()
 RETURNS TABLE(user_id UUID)

@@ -7,6 +7,8 @@ export type UpdateSessionResult = {
   /** Next.js response including refreshed Supabase auth cookies when applicable. */
   response: NextResponse;
   user: User | null;
+  /** From public.profiles when user is logged in; null if not signed in. */
+  accountStatus: 'active' | 'banned' | null;
 };
 
 /**
@@ -44,5 +46,16 @@ export const updateSession = async (request: NextRequest): Promise<UpdateSession
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { response: supabaseResponse, user };
+  let accountStatus: 'active' | 'banned' | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('account_status')
+      .eq('id', user.id)
+      .maybeSingle();
+    const raw = (profile as { account_status?: string } | null)?.account_status;
+    accountStatus = raw === 'banned' ? 'banned' : 'active';
+  }
+
+  return { response: supabaseResponse, user, accountStatus };
 };
