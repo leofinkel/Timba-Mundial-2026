@@ -52,7 +52,9 @@ CREATE TABLE public.teams (
   group_id TEXT CHECK (
     group_id IS NULL
     OR group_id IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
-  )
+  ),
+  fifa_ranking INTEGER,
+  group_stage_fair_play_score INTEGER
 );
 
 COMMENT ON TABLE public.teams IS 'World Cup teams; id is a stable slug (e.g. arg), code is FIFA-style 3 letters.';

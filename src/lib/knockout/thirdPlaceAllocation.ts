@@ -1,9 +1,12 @@
 /**
- * Third-place allocation logic for FIFA 2026 World Cup (48 teams, 12 groups).
- * 8 best third-place teams qualify for the Round of 32.
- * Each R32 slot accepts thirds from specific groups — we use bipartite matching
- * (augmenting-paths) to find a valid assignment for any qualifying combination.
+ * Third-place allocation for FIFA World Cup 2026 (48 teams, 12 groups).
+ * Ranking: pts → GD → GF → fair play (card weights) → FIFA ranking.
+ * Bracket: official 495-combination matrix (Annex C / Wikipedia template).
  */
+
+import { THIRD_PLACE_COMBINATION_MATRIX } from '@/constants/thirdPlaceBracketMatrix';
+
+const DEFAULT_FIFA_RANK_FALLBACK = 999;
 
 export type ThirdPlaceTeam = {
   groupId: string;
@@ -11,18 +14,86 @@ export type ThirdPlaceTeam = {
   points: number;
   goalDifference: number;
   goalsFor: number;
+  /**
+   * FIFA fair-play sum for the group stage (yellow -1, indirect red -3, direct red -4).
+   * Higher is better (closer to zero from below).
+   */
+  fairPlayScore: number;
+  /** FIFA men's ranking position at tournament start; lower is better. */
+  fifaRank: number;
 };
 
-export type ThirdPlaceSlot = {
-  matchNumber: number;
-  eligibleGroups: string[];
+/** Card counts in the group stage — used to build fairPlayScore. */
+export type ThirdPlaceDiscipline = {
+  yellowCards: number;
+  /** Second yellow / indirect red card */
+  redCardsIndirect: number;
+  redCardsDirect: number;
 };
 
 /**
- * R32 slots that receive a best-third team (always as the away side).
- * Parsed from the official bracket in seed.sql.
+ * FIFA disciplinary points for fair-play comparison (Regulations).
+ * Returns a single sum: higher value = better fair play.
  */
-export const THIRD_PLACE_SLOTS: ThirdPlaceSlot[] = [
+export const computeFairPlayScore = (d: ThirdPlaceDiscipline): number =>
+  -1 * d.yellowCards - 3 * d.redCardsIndirect - 4 * d.redCardsDirect;
+
+export const rankThirdPlaceTeams = (thirds: ThirdPlaceTeam[]): ThirdPlaceTeam[] =>
+  [...thirds].sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.goalDifference !== a.goalDifference)
+      return b.goalDifference - a.goalDifference;
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    if (b.fairPlayScore !== a.fairPlayScore) return b.fairPlayScore - a.fairPlayScore;
+    return a.fifaRank - b.fifaRank;
+  });
+
+/**
+ * Build ThirdPlaceTeam with neutral tiebreakers when discipline / FIFA rank are unknown.
+ */
+export const buildThirdPlaceRow = (
+  base: Omit<ThirdPlaceTeam, 'fairPlayScore' | 'fifaRank'> & {
+    fairPlayScore?: number;
+    fifaRank?: number | null;
+  },
+): ThirdPlaceTeam => ({
+  ...base,
+  fairPlayScore: base.fairPlayScore ?? 0,
+  fifaRank: base.fifaRank ?? DEFAULT_FIFA_RANK_FALLBACK,
+});
+
+/**
+ * Map from sorted key of 8 qualifying group letters → (group letter → R32 match_number).
+ * Source: official combination table (495 rows).
+ */
+const combinationKey = (qualifyingGroups: string[]): string =>
+  [...qualifyingGroups].sort().join('');
+
+/**
+ * Assign each qualifying third-placed team to its Round-of-32 match number
+ * using the FIFA combination matrix (not graph matching).
+ */
+export const lookupOfficialThirdPlaceAllocation = (
+  qualifyingGroups: string[],
+): Map<string, number> => {
+  if (qualifyingGroups.length !== 8) {
+    throw new Error(
+      `Third-place allocation requires exactly 8 groups; got ${qualifyingGroups.length}`,
+    );
+  }
+  const key = combinationKey(qualifyingGroups);
+  const row = THIRD_PLACE_COMBINATION_MATRIX[key];
+  if (!row) {
+    throw new Error(`No third-place matrix row for combination "${key}"`);
+  }
+  return new Map(Object.entries(row).map(([g, n]) => [g, n]));
+};
+
+/**
+ * @deprecated Prefer {@link lookupOfficialThirdPlaceAllocation}. Kept for tests / tooling.
+ * Eligible third slots per R32 match (third is always away in these fixtures).
+ */
+export const THIRD_PLACE_SLOTS = [
   { matchNumber: 74, eligibleGroups: ['A', 'B', 'C', 'D', 'F'] },
   { matchNumber: 77, eligibleGroups: ['C', 'D', 'F', 'G', 'H'] },
   { matchNumber: 79, eligibleGroups: ['C', 'E', 'F', 'H', 'I'] },
@@ -31,26 +102,11 @@ export const THIRD_PLACE_SLOTS: ThirdPlaceSlot[] = [
   { matchNumber: 82, eligibleGroups: ['A', 'E', 'H', 'I', 'J'] },
   { matchNumber: 85, eligibleGroups: ['E', 'F', 'G', 'I', 'J'] },
   { matchNumber: 87, eligibleGroups: ['D', 'E', 'I', 'J', 'L'] },
-];
+] as const;
 
-export const rankThirdPlaceTeams = (
-  thirds: ThirdPlaceTeam[],
-): ThirdPlaceTeam[] =>
-  [...thirds].sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.goalDifference !== a.goalDifference)
-      return b.goalDifference - a.goalDifference;
-    return b.goalsFor - a.goalsFor;
-  });
-
-/**
- * Solve the assignment of qualifying groups to R32 slots using
- * augmenting-path bipartite matching (tiny 8×8 graph).
- * @returns Map of groupLetter → matchNumber
- */
 export const solveBipartiteMatching = (
   qualifyingGroups: string[],
-  slots: ThirdPlaceSlot[] = THIRD_PLACE_SLOTS,
+  slots: readonly { matchNumber: number; eligibleGroups: readonly string[] }[] = THIRD_PLACE_SLOTS,
 ): Map<string, number> => {
   const adj = new Map<string, number[]>();
   for (const group of qualifyingGroups) {
@@ -90,10 +146,6 @@ export const solveBipartiteMatching = (
   return result;
 };
 
-/**
- * Resolve a direct source like "1A" or "2B" to the team ID using ordered standings.
- * @param standingsByGroup Map of groupLetter → [pos1TeamId, pos2TeamId, pos3TeamId, pos4TeamId]
- */
 export const resolveDirectSource = (
   source: string,
   standingsByGroup: Map<string, string[]>,
@@ -107,11 +159,6 @@ export const resolveDirectSource = (
   return order[position - 1] ?? null;
 };
 
-/**
- * Build full R32 allocation from group standings.
- * @param standingsByGroup Map of groupLetter → [pos1TeamId, pos2TeamId, pos3TeamId, pos4TeamId]
- * @returns Map of matchNumber → { homeTeamId, awayTeamId }
- */
 export const buildRoundOf32Allocation = (
   standingsByGroup: Map<string, string[]>,
 ): Map<number, { homeTeamId: string | null; awayTeamId: string | null }> => {
@@ -124,14 +171,16 @@ export const buildRoundOf32Allocation = (
         points: 0,
         goalDifference: 0,
         goalsFor: 0,
+        fairPlayScore: 0,
+        fifaRank: DEFAULT_FIFA_RANK_FALLBACK,
       });
     }
   }
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId).sort();
-  const allocation = solveBipartiteMatching(qualifyingGroups);
+  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) {

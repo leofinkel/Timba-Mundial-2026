@@ -19,6 +19,13 @@ export interface Team {
   flagUrl: string;
   /** Set after the draw; `null` until groups are assigned. */
   groupId: GroupName | null;
+  /** FIFA men's ranking at tournament start (lower = better). Optional until DB seeded. */
+  fifaRanking?: number | null;
+  /**
+   * Group-stage fair-play sum (yellow -1, indirect red -3, direct red -4). Higher = better.
+   * Optional; defaults to neutral in third-place ranking when absent.
+   */
+  groupStageFairPlayScore?: number | null;
 }
 
 export type Confederation =

@@ -4,9 +4,8 @@ import type {
 } from '@/types/bracket';
 
 /**
- * Third-place bracket matrix: the bipartite allocation is now solved
- * at runtime in src/lib/knockout/thirdPlaceAllocation.ts.
- * Kept for backward compatibility with any code referencing this constant.
+ * Third-place bracket: official 495-combination matrix lives in
+ * `src/constants/thirdPlaceBracketMatrix.ts` (lookup in thirdPlaceAllocation.ts).
  */
 export const THIRD_PLACE_BRACKET_MATRIX: ThirdPlaceBracketMatrix = {};
 

@@ -2,10 +2,10 @@ import 'server-only';
 
 import { createServiceLogger } from '@/lib/logger';
 import {
+  buildThirdPlaceRow,
+  lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
   resolveDirectSource,
-  solveBipartiteMatching,
-  THIRD_PLACE_SLOTS,
 } from '@/lib/knockout/thirdPlaceAllocation';
 import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
 import { createServerClient } from '@/lib/supabase/server';
@@ -19,6 +19,12 @@ type StandingRow = {
   points: number;
   goal_difference: number;
   goals_for: number;
+};
+
+type TeamRankingRow = {
+  id: string;
+  fifa_ranking: number | null;
+  group_stage_fair_play_score: number | null;
 };
 
 const GROUP_MATCH_TOTAL = 72;
@@ -60,16 +66,27 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
     return false;
   }
 
-  const { data: standings, error: standErr } = await supabase
-    .from('group_standings')
-    .select('group_id, team_id, position, points, goal_difference, goals_for');
+  const [{ data: standings, error: standErr }, { data: teamRanking, error: teamErr }] =
+    await Promise.all([
+      supabase
+        .from('group_standings')
+        .select('group_id, team_id, position, points, goal_difference, goals_for'),
+      supabase.from('teams').select('id, fifa_ranking, group_stage_fair_play_score'),
+    ]);
 
   if (standErr || !standings) {
     log.error({ err: standErr }, 'populateRoundOf32: standings query failed');
     throw new Error(standErr?.message ?? 'No standings data');
   }
+  if (teamErr) {
+    log.error({ err: teamErr }, 'populateRoundOf32: teams ranking query failed');
+    throw new Error(teamErr.message);
+  }
 
   const typedStandings = standings as StandingRow[];
+  const teamMeta = new Map(
+    ((teamRanking ?? []) as TeamRankingRow[]).map((t) => [t.id, t]),
+  );
 
   const standingsByGroup = new Map<string, string[]>();
   for (const s of typedStandings) {
@@ -80,18 +97,23 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
   const thirds: ThirdPlaceTeam[] = typedStandings
     .filter((s) => s.position === 3)
-    .map((s) => ({
-      groupId: s.group_id,
-      teamId: s.team_id,
-      points: s.points,
-      goalDifference: s.goal_difference,
-      goalsFor: s.goals_for,
-    }));
+    .map((s) => {
+      const tr = teamMeta.get(s.team_id);
+      return buildThirdPlaceRow({
+        groupId: s.group_id,
+        teamId: s.team_id,
+        points: s.points,
+        goalDifference: s.goal_difference,
+        goalsFor: s.goals_for,
+        fairPlayScore: tr?.group_stage_fair_play_score ?? undefined,
+        fifaRank: tr?.fifa_ranking ?? undefined,
+      });
+    });
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId).sort();
-  const allocation = solveBipartiteMatching(qualifyingGroups, THIRD_PLACE_SLOTS);
+  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) {

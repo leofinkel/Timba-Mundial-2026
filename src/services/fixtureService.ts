@@ -20,6 +20,8 @@ type TeamRow = {
   code: string;
   flag_url: string | null;
   group_id: string | null;
+  fifa_ranking: number | null;
+  group_stage_fair_play_score: number | null;
 };
 
 type MatchRow = {
@@ -44,6 +46,8 @@ const mapTeamRow = (row: TeamRow): Team => ({
   code: row.code,
   flagUrl: row.flag_url ?? '',
   groupId: (row.group_id as GroupName) ?? null,
+  fifaRanking: row.fifa_ranking,
+  groupStageFairPlayScore: row.group_stage_fair_play_score,
 });
 
 export const getTournament = async (): Promise<Tournament> => {

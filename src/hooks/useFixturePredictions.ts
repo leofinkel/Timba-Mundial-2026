@@ -9,10 +9,10 @@ import {
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import {
-  resolveDirectSource,
-  THIRD_PLACE_SLOTS,
+  buildThirdPlaceRow,
+  lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
-  solveBipartiteMatching,
+  resolveDirectSource,
 } from '@/lib/knockout/thirdPlaceAllocation';
 import type {
   GroupMatchPrediction,
@@ -20,6 +20,7 @@ import type {
   SpecialPrediction,
   UserPrediction,
 } from '@/types/prediction';
+import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
 import { KNOCKOUT_ROUNDS } from '@/constants/tournament';
 import type { GroupName, GroupStanding, KnockoutMatch, Tournament } from '@/types/tournament';
 
@@ -239,26 +240,22 @@ const resolveR32Teams = (
     .map(([groupId, rows]) => {
       const third = rows[2];
       if (!third) return null;
-      return {
+      return buildThirdPlaceRow({
         groupId,
         teamId: third.team.id,
         points: third.points,
         goalDifference: third.goalDifference,
         goalsFor: third.goalsFor,
-      };
+        fairPlayScore: third.team.groupStageFairPlayScore ?? undefined,
+        fifaRank: third.team.fifaRanking ?? undefined,
+      });
     })
-    .filter(Boolean) as Array<{
-    groupId: string;
-    teamId: string;
-    points: number;
-    goalDifference: number;
-    goalsFor: number;
-  }>;
+    .filter((row): row is ThirdPlaceTeam => row !== null);
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId).sort();
-  const allocation = solveBipartiteMatching(qualifyingGroups, THIRD_PLACE_SLOTS);
+  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) thirdTeamByGroup.set(t.groupId, t.teamId);
