@@ -75,10 +75,12 @@ const mapRowsToUserPrediction = async (
         awayGoals: row.away_goals,
       });
     } else {
+      // Knockout slots are derived from group scores + third-place matrix (not from
+      // `matches.home_team_id`, which may hold admin/real bracket data).
       knockoutPredictions.push({
         matchId: row.match_id,
-        homeTeamId: m.home_team_id ?? '',
-        awayTeamId: m.away_team_id ?? '',
+        homeTeamId: '',
+        awayTeamId: '',
         homeGoals: row.home_goals,
         awayGoals: row.away_goals,
         winnerId: row.winner_team_id ?? '',

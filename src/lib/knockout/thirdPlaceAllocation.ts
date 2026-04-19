@@ -14,6 +14,10 @@ const DEFAULT_FIFA_RANK_FALLBACK = 999;
 export type ThirdPlaceTeam = {
   groupId: string;
   teamId: string;
+  /**
+   * FIFA tiebreaker after ranking: alphabetical by team name (same as `get_best_third_place_teams` SQL).
+   */
+  tiebreakName: string;
   points: number;
   goalDifference: number;
   goalsFor: number;
@@ -48,7 +52,8 @@ export const rankThirdPlaceTeams = (thirds: ThirdPlaceTeam[]): ThirdPlaceTeam[] 
       return b.goalDifference - a.goalDifference;
     if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
     if (b.fairPlayScore !== a.fairPlayScore) return b.fairPlayScore - a.fairPlayScore;
-    return a.fifaRank - b.fifaRank;
+    if (a.fifaRank !== b.fifaRank) return a.fifaRank - b.fifaRank;
+    return a.tiebreakName.localeCompare(b.tiebreakName, 'en');
   });
 
 /**
@@ -58,9 +63,11 @@ export const buildThirdPlaceRow = (
   base: Omit<ThirdPlaceTeam, 'fairPlayScore' | 'fifaRank'> & {
     fairPlayScore?: number;
     fifaRank?: number | null;
+    tiebreakName?: string;
   },
 ): ThirdPlaceTeam => ({
   ...base,
+  tiebreakName: base.tiebreakName ?? base.teamId,
   fairPlayScore: base.fairPlayScore ?? 0,
   fifaRank: base.fifaRank ?? DEFAULT_FIFA_RANK_FALLBACK,
 });
@@ -168,6 +175,7 @@ export const buildRoundOf32Allocation = (
       thirds.push({
         groupId,
         teamId: order[2],
+        tiebreakName: order[2],
         points: 0,
         goalDifference: 0,
         goalsFor: 0,

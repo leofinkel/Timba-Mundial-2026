@@ -28,6 +28,7 @@ type StandingRow = {
 
 type TeamRankingRow = {
   id: string;
+  name: string | null;
   fifa_ranking: number | null;
   group_stage_fair_play_score: number | null;
 };
@@ -65,7 +66,7 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
       supabase
         .from('group_standings')
         .select('group_id, team_id, position, points, goal_difference, goals_for'),
-      supabase.from('teams').select('id, fifa_ranking, group_stage_fair_play_score'),
+      supabase.from('teams').select('id, name, fifa_ranking, group_stage_fair_play_score'),
     ]);
 
   if (standErr || !standings) {
@@ -96,6 +97,7 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
       return buildThirdPlaceRow({
         groupId: s.group_id,
         teamId: s.team_id,
+        tiebreakName: tr?.name?.trim() || s.team_id,
         points: s.points,
         goalDifference: s.goal_difference,
         goalsFor: s.goals_for,

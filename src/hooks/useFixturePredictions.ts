@@ -168,8 +168,8 @@ const buildKnockoutPredictionState = (
   const state: Record<string, KnockoutMatchPrediction> = {};
   for (const m of matches) {
     const ex = byId.get(m.id);
-    const homeTeamId = m.homeTeam?.id ?? ex?.homeTeamId ?? '';
-    const awayTeamId = m.awayTeam?.id ?? ex?.awayTeamId ?? '';
+    const homeTeamId = ex?.homeTeamId ?? m.homeTeam?.id ?? '';
+    const awayTeamId = ex?.awayTeamId ?? m.awayTeam?.id ?? '';
     state[m.id] = {
       matchId: m.id,
       homeTeamId,
@@ -244,6 +244,7 @@ const resolveR32Teams = (
       return buildThirdPlaceRow({
         groupId,
         teamId: third.team.id,
+        tiebreakName: third.team.name,
         points: third.points,
         goalDifference: third.goalDifference,
         goalsFor: third.goalsFor,
