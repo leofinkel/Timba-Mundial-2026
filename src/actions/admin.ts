@@ -34,6 +34,7 @@ import {
   deleteUserPredictionForAdmin,
   getUserPredictionForAdmin,
 } from '@/services/predictionService';
+import { syncAllSavedPredictionsBracketLogic } from '@/services/syncSavedPredictionsBracket';
 import type { UserPredictionView } from '@/types/prediction';
 import type {
   AdminClassificationEntry,
@@ -566,6 +567,39 @@ export const getAdminUserPredictionAction = async (
     if (message === 'Forbidden') {
       return { success: false, error: 'Forbidden' };
     }
+    return { success: false, error: message };
+  }
+};
+
+export const syncSavedPredictionsBracketAdminAction = async (): Promise<
+  | {
+      success: true;
+      data: {
+        processedPredictions: number;
+        skippedIncompleteGroup: number;
+        clearedInvalidWinners: number;
+        scoreRpcErrors: number;
+      };
+    }
+  | { success: false; error: string }
+> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    const data = await syncAllSavedPredictionsBracketLogic();
+    revalidatePath('/admin');
+    revalidatePath('/fixture');
+    revalidatePath('/rankings');
+    return { success: true, data };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
     return { success: false, error: message };
   }
 };

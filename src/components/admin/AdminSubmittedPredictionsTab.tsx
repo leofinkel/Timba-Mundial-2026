@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { deleteUserPredictionAsAdminAction } from '@/actions/admin';
+import { deleteUserPredictionAsAdminAction, syncSavedPredictionsBracketAdminAction } from '@/actions/admin';
 import { OtherUserPredictionsDialog } from '@/components/rankings/OtherUserPredictionsDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ export const AdminSubmittedPredictionsTab = ({
   const [deleteTarget, setDeleteTarget] = useState<AdminSubmittedPredictionUser | null>(null);
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [deletePending, setDeletePending] = useState(false);
+  const [syncPending, setSyncPending] = useState(false);
 
   const resetDeleteDialog = () => {
     setDeleteTarget(null);
@@ -80,6 +81,26 @@ export const AdminSubmittedPredictionsTab = ({
     toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
   };
 
+  const handleSyncBracket = async () => {
+    setSyncPending(true);
+    const res = await syncSavedPredictionsBracketAdminAction();
+    setSyncPending(false);
+    if (res.success) {
+      const rpcNote =
+        res.data.scoreRpcErrors > 0
+          ? ` Aviso: ${res.data.scoreRpcErrors} errores al recalcular puntajes (RPC).`
+          : '';
+      toast.success(
+        `Sincronizado: ${res.data.processedPredictions} planillas con 72/72 grupos; ` +
+          `omitidas (grupo incompleto): ${res.data.skippedIncompleteGroup}; ` +
+          `ganadores KO invalidados: ${res.data.clearedInvalidWinners}.${rpcNote}`,
+      );
+      router.refresh();
+      return;
+    }
+    toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">
@@ -87,6 +108,22 @@ export const AdminSubmittedPredictionsTab = ({
         sus pronósticos en cualquier momento. Como admin podés borrar una planilla (doble
         confirmación).
       </p>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-4 py-3">
+        <p className="text-sm text-zinc-300">
+          Tras cambiar la lógica de mejores terceros / bracket, sincronizá las planillas guardadas:
+          recalcula tablas de grupo, valida ganadores de eliminatoria y recalcula puntajes.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={syncPending}
+          onClick={() => void handleSyncBracket()}
+          className="shrink-0 border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700"
+        >
+          {syncPending ? 'Sincronizando…' : 'Sincronizar planillas (nueva lógica)'}
+        </Button>
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-zinc-800/80">
         <Table>

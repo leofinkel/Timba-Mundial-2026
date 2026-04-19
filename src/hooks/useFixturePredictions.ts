@@ -8,20 +8,14 @@ import {
   reorderStandingsByTeamOrder,
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
-import {
-  buildThirdPlaceRow,
-  isThirdPlaceKnockoutSource,
-  lookupOfficialThirdPlaceAllocation,
-  rankThirdPlaceTeams,
-  resolveDirectSource,
-} from '@/lib/knockout/thirdPlaceAllocation';
+import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
+import { resolveR32MatchTeamSlotsFromStandings } from '@/lib/knockout/resolveR32MatchTeamSlots';
 import type {
   GroupMatchPrediction,
   KnockoutMatchPrediction,
   SpecialPrediction,
   UserPrediction,
 } from '@/types/prediction';
-import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
 import { KNOCKOUT_ROUNDS } from '@/constants/tournament';
 import type { GroupName, GroupStanding, KnockoutMatch, Tournament } from '@/types/tournament';
 
@@ -98,23 +92,6 @@ export type UseFixturePredictionsArgs = {
 };
 
 export type GroupPredictionState = GroupMatchScoresInput;
-
-/** True when every group match has a valid predicted score (required before deriving R32 from standings). */
-const isGroupStagePredictionComplete = (
-  groups: Tournament['groups'],
-  predictions: GroupMatchScoresInput,
-): boolean => {
-  for (const g of groups) {
-    for (const m of g.matches) {
-      const p = predictions[m.id];
-      if (!p || p.homeGoals === null || p.awayGoals === null) return false;
-      const hg = p.homeGoals;
-      const ag = p.awayGoals;
-      if (!Number.isFinite(hg) || !Number.isFinite(ag) || hg < 0 || ag < 0) return false;
-    }
-  }
-  return true;
-};
 
 /** Strip user-predicted teams; keep only slots fixed by the tournament (official results in DB). */
 const clearKnockoutToOfficialOnly = (
@@ -220,91 +197,6 @@ const buildWinnerSourceMap = (
     }
   }
   return map;
-};
-
-/**
- * Resolve R32 teams from predicted group standings.
- */
-const resolveR32Teams = (
-  knockoutMatches: KnockoutMatch[],
-  standings: Record<GroupName, GroupStanding[]>,
-): Record<string, { homeTeamId: string; awayTeamId: string }> => {
-  const standingsByGroup = new Map<string, string[]>();
-  for (const [g, rows] of Object.entries(standings)) {
-    standingsByGroup.set(
-      g,
-      rows.map((r) => r.team.id),
-    );
-  }
-
-  const thirds = Object.entries(standings)
-    .map(([groupId, rows]) => {
-      const third = rows[2];
-      if (!third) return null;
-      return buildThirdPlaceRow({
-        groupId,
-        teamId: third.team.id,
-        tiebreakName: third.team.name,
-        points: third.points,
-        goalDifference: third.goalDifference,
-        goalsFor: third.goalsFor,
-        fairPlayScore: third.team.groupStageFairPlayScore ?? undefined,
-        fifaRank: third.team.fifaRanking ?? undefined,
-      });
-    })
-    .filter((row): row is ThirdPlaceTeam => row !== null);
-
-  const ranked = rankThirdPlaceTeams(thirds);
-  const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId);
-  const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
-
-  const thirdTeamByGroup = new Map<string, string>();
-  for (const t of qualifying) thirdTeamByGroup.set(t.groupId, t.teamId);
-
-  const result: Record<string, { homeTeamId: string; awayTeamId: string }> = {};
-
-  for (const m of knockoutMatches) {
-    if (m.round !== 'round-of-32') continue;
-
-    // Always derive R32 from predicted standings + sources + third matrix.
-    // Do not seed from m.homeTeam/m.awayTeam (DB snapshot): after tiebreaker or
-    // matrix updates, stored teams would block recalculation for saved fixtures.
-    let homeTeamId = '';
-    let awayTeamId = '';
-
-    if (m.homeSource) {
-      if (isThirdPlaceKnockoutSource(m.homeSource)) {
-        for (const [group, matchNum] of allocation) {
-          if (matchNum === m.matchNumber) {
-            homeTeamId = thirdTeamByGroup.get(group) ?? '';
-            break;
-          }
-        }
-      } else {
-        homeTeamId = resolveDirectSource(m.homeSource, standingsByGroup) ?? '';
-      }
-    }
-
-    if (m.awaySource) {
-      if (isThirdPlaceKnockoutSource(m.awaySource)) {
-        for (const [group, matchNum] of allocation) {
-          if (matchNum === m.matchNumber) {
-            awayTeamId = thirdTeamByGroup.get(group) ?? '';
-            break;
-          }
-        }
-      } else {
-        awayTeamId = resolveDirectSource(m.awaySource, standingsByGroup) ?? '';
-      }
-    }
-
-    if (homeTeamId || awayTeamId) {
-      result[m.id] = { homeTeamId, awayTeamId };
-    }
-  }
-
-  return result;
 };
 
 export const useFixturePredictions = ({
@@ -422,7 +314,7 @@ export const useFixturePredictions = ({
       return;
     }
 
-    const r32Teams = resolveR32Teams(
+    const r32Teams = resolveR32MatchTeamSlotsFromStandings(
       tournament.knockoutMatches,
       calculatedStandings,
     );
