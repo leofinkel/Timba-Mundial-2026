@@ -266,10 +266,13 @@ const resolveR32Teams = (
   for (const m of knockoutMatches) {
     if (m.round !== 'round-of-32') continue;
 
-    let homeTeamId = m.homeTeam?.id ?? '';
-    let awayTeamId = m.awayTeam?.id ?? '';
+    // Always derive R32 from predicted standings + sources + third matrix.
+    // Do not seed from m.homeTeam/m.awayTeam (DB snapshot): after tiebreaker or
+    // matrix updates, stored teams would block recalculation for saved fixtures.
+    let homeTeamId = '';
+    let awayTeamId = '';
 
-    if (!homeTeamId && m.homeSource) {
+    if (m.homeSource) {
       if (isThirdPlaceKnockoutSource(m.homeSource)) {
         for (const [group, matchNum] of allocation) {
           if (matchNum === m.matchNumber) {
@@ -282,7 +285,7 @@ const resolveR32Teams = (
       }
     }
 
-    if (!awayTeamId && m.awaySource) {
+    if (m.awaySource) {
       if (isThirdPlaceKnockoutSource(m.awaySource)) {
         for (const [group, matchNum] of allocation) {
           if (matchNum === m.matchNumber) {
