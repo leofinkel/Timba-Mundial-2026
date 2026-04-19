@@ -60,8 +60,9 @@ const FixturePage = async () => {
       <div className="relative mx-auto w-full max-w-6xl space-y-2">
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Fixture</h1>
         <p className="mt-1 text-sm text-zinc-400 sm:text-base">
-          Cargá marcadores y definiciones por fase. El guardado completo se habilitará en las
-          próximas iteraciones.
+          Cargá los 72 partidos de grupo; con todos los resultados, los 16avos se arman solos
+          (mejores terceros según la tabla oficial de 495 combinaciones). Después completá
+          eliminatorias, goleador y figura.
         </p>
       </div>
 

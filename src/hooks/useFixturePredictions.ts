@@ -10,6 +10,7 @@ import {
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import {
   buildThirdPlaceRow,
+  isThirdPlaceKnockoutSource,
   lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
   resolveDirectSource,
@@ -269,11 +270,20 @@ const resolveR32Teams = (
     let awayTeamId = m.awayTeam?.id ?? '';
 
     if (!homeTeamId && m.homeSource) {
-      homeTeamId = resolveDirectSource(m.homeSource, standingsByGroup) ?? '';
+      if (isThirdPlaceKnockoutSource(m.homeSource)) {
+        for (const [group, matchNum] of allocation) {
+          if (matchNum === m.matchNumber) {
+            homeTeamId = thirdTeamByGroup.get(group) ?? '';
+            break;
+          }
+        }
+      } else {
+        homeTeamId = resolveDirectSource(m.homeSource, standingsByGroup) ?? '';
+      }
     }
 
     if (!awayTeamId && m.awaySource) {
-      if (m.awaySource.startsWith('3-')) {
+      if (isThirdPlaceKnockoutSource(m.awaySource)) {
         for (const [group, matchNum] of allocation) {
           if (matchNum === m.matchNumber) {
             awayTeamId = thirdTeamByGroup.get(group) ?? '';

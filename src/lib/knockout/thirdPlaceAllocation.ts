@@ -146,6 +146,10 @@ export const solveBipartiteMatching = (
   return result;
 };
 
+/** DB uses `3-ABCDF` placeholders; `3` alone is accepted for legacy rows. */
+export const isThirdPlaceKnockoutSource = (src: string | null | undefined): boolean =>
+  !!src && (src === '3' || src.startsWith('3-'));
+
 export const resolveDirectSource = (
   source: string,
   standingsByGroup: Map<string, string[]>,
@@ -219,7 +223,7 @@ export const buildRoundOf32Allocation = (
     const homeTeamId = resolveDirectSource(s.homeSrc, standingsByGroup);
     let awayTeamId: string | null = null;
 
-    if (s.awaySrc === '3') {
+    if (s.awaySrc === '3' || s.awaySrc.startsWith('3-')) {
       for (const [group, matchNum] of allocation) {
         if (matchNum === s.matchNumber) {
           awayTeamId = thirdTeamByGroup.get(group) ?? null;

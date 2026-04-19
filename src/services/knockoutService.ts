@@ -3,6 +3,7 @@ import 'server-only';
 import { createServiceLogger } from '@/lib/logger';
 import {
   buildThirdPlaceRow,
+  isThirdPlaceKnockoutSource,
   lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
   resolveDirectSource,
@@ -30,9 +31,10 @@ type TeamRankingRow = {
 const GROUP_MATCH_TOTAL = 72;
 
 /**
- * Checks whether all 72 group-stage matches have results,
- * and if so, populates every Round-of-32 match with the correct teams
- * based on group standings + best-third allocation.
+ * When all 72 group-stage matches have results, fills Round-of-32 `home_team_id` /
+ * `away_team_id` from standings + official third-place matrix (495 combinations).
+ * Idempotent: skips matches that already have a stored result; refills any still-open slot
+ * (e.g. after a partial run or standings correction before 16avos are played).
  */
 export const populateRoundOf32 = async (): Promise<boolean> => {
   const supabase = await createServerClient();
@@ -51,18 +53,6 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
   if ((count ?? 0) < GROUP_MATCH_TOTAL) {
     log.debug({ played: count }, 'Group stage not yet complete');
-    return false;
-  }
-
-  const { data: r32Check } = await supabase
-    .from('matches')
-    .select('home_team_id')
-    .eq('stage', 'round-of-32')
-    .not('home_team_id', 'is', null)
-    .limit(1);
-
-  if (r32Check && r32Check.length > 0) {
-    log.debug('R32 already populated');
     return false;
   }
 
@@ -122,7 +112,9 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
   const { data: r32Matches, error: r32Err } = await supabase
     .from('matches')
-    .select('id, match_number, home_source, away_source')
+    .select(
+      'id, match_number, home_source, away_source, home_goals, away_goals, home_team_id, away_team_id',
+    )
     .eq('stage', 'round-of-32')
     .order('match_number');
 
@@ -131,48 +123,63 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
     throw new Error(r32Err?.message ?? 'No R32 matches');
   }
 
+  const resolveThirdForMatch = (matchNumber: number): string | null => {
+    for (const [group, matchNum] of allocation) {
+      if (matchNum === matchNumber) return thirdTeamByGroup.get(group) ?? null;
+    }
+    return null;
+  };
+
+  let updatedRows = 0;
+
   for (const m of r32Matches) {
-    let homeTeamId: string | null = null;
-    let awayTeamId: string | null = null;
+    if (m.home_goals != null && m.away_goals != null) {
+      continue;
+    }
+
+    let homeComputed: string | null = null;
+    let awayComputed: string | null = null;
 
     if (m.home_source) {
-      homeTeamId = resolveDirectSource(m.home_source, standingsByGroup);
+      if (isThirdPlaceKnockoutSource(m.home_source)) {
+        homeComputed = resolveThirdForMatch(m.match_number);
+      } else {
+        homeComputed = resolveDirectSource(m.home_source, standingsByGroup);
+      }
     }
 
     if (m.away_source) {
-      if (m.away_source.startsWith('3-')) {
-        for (const [group, matchNum] of allocation) {
-          if (matchNum === m.match_number) {
-            awayTeamId = thirdTeamByGroup.get(group) ?? null;
-            break;
-          }
-        }
+      if (isThirdPlaceKnockoutSource(m.away_source)) {
+        awayComputed = resolveThirdForMatch(m.match_number);
       } else {
-        awayTeamId = resolveDirectSource(m.away_source, standingsByGroup);
+        awayComputed = resolveDirectSource(m.away_source, standingsByGroup);
       }
     }
 
-    if (homeTeamId || awayTeamId) {
-      const update: Record<string, string | null> = {};
-      if (homeTeamId) update.home_team_id = homeTeamId;
-      if (awayTeamId) update.away_team_id = awayTeamId;
+    const nextHome = homeComputed ?? m.home_team_id ?? null;
+    const nextAway = awayComputed ?? m.away_team_id ?? null;
 
-      const { error: upErr } = await supabase
-        .from('matches')
-        .update(update)
-        .eq('id', m.id);
+    if (nextHome === m.home_team_id && nextAway === m.away_team_id) {
+      continue;
+    }
 
-      if (upErr) {
-        log.error({ err: upErr, matchNumber: m.match_number }, 'R32 team update failed');
-      }
+    const { error: upErr } = await supabase
+      .from('matches')
+      .update({ home_team_id: nextHome, away_team_id: nextAway })
+      .eq('id', m.id);
+
+    if (upErr) {
+      log.error({ err: upErr, matchNumber: m.match_number }, 'R32 team update failed');
+    } else {
+      updatedRows += 1;
     }
   }
 
   log.info(
-    { qualifyingThirds: qualifyingGroups.join(',') },
+    { qualifyingThirds: qualifyingGroups.join(','), updatedRows },
     'Round of 32 populated',
   );
-  return true;
+  return updatedRows > 0;
 };
 
 /**
