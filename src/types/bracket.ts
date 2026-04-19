@@ -9,7 +9,7 @@ export type RoundOf32MatchTemplate = {
 
 /**
  * For each group that supplies a best-third qualifier, where that team is slotted in Ro32.
- * TODO: Populate from official FIFA 2026 matrix when released.
+ * Matrix: `src/constants/thirdPlaceBracketMatrix.ts` (+ `thirdPlaceCombinationMeta` for línea).
  */
 export type ThirdPlaceSlotAssignment = {
   readonly matchId: string;

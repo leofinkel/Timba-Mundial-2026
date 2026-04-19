@@ -220,6 +220,28 @@ COMMENT ON TABLE public.real_group_standings IS
   'When a group has 4 rows, public.group_standings uses these positions instead of computed order.';
 
 -- -----------------------------------------------------------------------------
+-- best_third_place_qualifiers: eight best thirds + FIFA combination row (admin job).
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.best_third_place_qualifiers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  combination_line SMALLINT NOT NULL CHECK (
+    combination_line >= 1
+    AND combination_line <= 495
+  ),
+  qualifying_groups_key TEXT NOT NULL,
+  excluded_groups_key TEXT NOT NULL,
+  rank_pos SMALLINT NOT NULL CHECK (rank_pos >= 1 AND rank_pos <= 8),
+  group_id TEXT NOT NULL,
+  team_id TEXT NOT NULL REFERENCES public.teams (id),
+  round_of_32_match_number SMALLINT NOT NULL,
+  opponent_source TEXT NOT NULL
+);
+
+COMMENT ON TABLE public.best_third_place_qualifiers IS
+  'Eight best group thirds; combination_line = sorted excluded-four index + 1 (FIFA/Excel).';
+
+-- -----------------------------------------------------------------------------
 -- news_posts: admin-published announcements shown on the landing/dashboard.
 -- -----------------------------------------------------------------------------
 CREATE TABLE public.news_posts (
@@ -266,6 +288,9 @@ CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
 
 CREATE INDEX idx_real_group_standings_group_id ON public.real_group_standings (group_id);
+
+CREATE INDEX idx_best_third_place_qualifiers_updated
+  ON public.best_third_place_qualifiers (updated_at DESC);
 
 -- =============================================================================
 -- SECTION: updated_at trigger
@@ -399,6 +424,7 @@ ALTER TABLE public.prediction_specials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_group_standings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.best_third_place_qualifiers ENABLE ROW LEVEL SECURITY;
 
 -- -----------------------------------------------------------------------------
 -- profiles
@@ -465,6 +491,18 @@ CREATE POLICY "matches_select_public"
 
 CREATE POLICY "matches_write_admin"
   ON public.matches
+  FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+CREATE POLICY "best_third_place_qualifiers_select_public"
+  ON public.best_third_place_qualifiers
+  FOR SELECT
+  USING (true);
+
+CREATE POLICY "best_third_place_qualifiers_write_admin"
+  ON public.best_third_place_qualifiers
   FOR ALL
   TO authenticated
   USING (public.is_admin())

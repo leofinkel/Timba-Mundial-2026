@@ -1,10 +1,13 @@
 /**
  * Third-place allocation for FIFA World Cup 2026 (48 teams, 12 groups).
  * Ranking: pts → GD → GF → fair play (card weights) → FIFA ranking.
- * Bracket: official 495-combination matrix (Annex C / Wikipedia template).
+ * Bracket: official 495-combination matrix (Annex C / project Excel). Matrix keys
+ * are the eight qualifying group letters sorted; FIFA "línea" = index of the
+ * complementary four excluded letters among C(12,4) sorted + 1 (see thirdPlaceCombinationMeta).
  */
 
 import { THIRD_PLACE_COMBINATION_MATRIX } from '@/constants/thirdPlaceBracketMatrix';
+import { qualifyingGroupsKey } from '@/lib/knockout/thirdPlaceCombinationMeta';
 
 const DEFAULT_FIFA_RANK_FALLBACK = 999;
 
@@ -63,25 +66,18 @@ export const buildThirdPlaceRow = (
 });
 
 /**
- * Map from sorted key of 8 qualifying group letters → (group letter → R32 match_number).
- * Source: official combination table (495 rows).
- */
-const combinationKey = (qualifyingGroups: string[]): string =>
-  [...qualifyingGroups].sort().join('');
-
-/**
  * Assign each qualifying third-placed team to its Round-of-32 match number
  * using the FIFA combination matrix (not graph matching).
  */
 export const lookupOfficialThirdPlaceAllocation = (
   qualifyingGroups: string[],
 ): Map<string, number> => {
-  if (qualifyingGroups.length !== 8) {
+  const key = qualifyingGroupsKey(qualifyingGroups);
+  if (key.length !== 8) {
     throw new Error(
-      `Third-place allocation requires exactly 8 groups; got ${qualifyingGroups.length}`,
+      `Third-place allocation requires 8 distinct qualifying groups; got key "${key}"`,
     );
   }
-  const key = combinationKey(qualifyingGroups);
   const row = THIRD_PLACE_COMBINATION_MATRIX[key];
   if (!row) {
     throw new Error(`No third-place matrix row for combination "${key}"`);

@@ -9,6 +9,10 @@ import {
   resolveDirectSource,
 } from '@/lib/knockout/thirdPlaceAllocation';
 import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
+import {
+  getThirdPlaceCombinationMeta,
+  R32_OPPONENT_SOURCE_FOR_THIRD_SLOT,
+} from '@/lib/knockout/thirdPlaceCombinationMeta';
 import { createServerClient } from '@/lib/supabase/server';
 
 const log = createServiceLogger('knockoutService');
@@ -104,6 +108,7 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
   const qualifying = ranked.slice(0, 8);
   const qualifyingGroups = qualifying.map((t) => t.groupId);
   const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
+  const combinationMeta = getThirdPlaceCombinationMeta(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) {
@@ -121,6 +126,44 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
   if (r32Err || !r32Matches) {
     log.error({ err: r32Err }, 'populateRoundOf32: R32 query failed');
     throw new Error(r32Err?.message ?? 'No R32 matches');
+  }
+
+  const { error: delQualErr } = await supabase
+    .from('best_third_place_qualifiers')
+    .delete()
+    .gte('rank_pos', 1);
+
+  if (delQualErr) {
+    log.warn({ err: delQualErr }, 'Could not clear best_third_place_qualifiers (table missing?)');
+  } else {
+    const qualifierRows = qualifying.map((t, i) => {
+      const matchNum = allocation.get(t.groupId);
+      if (matchNum == null) {
+        throw new Error(`No matrix slot for third of group ${t.groupId}`);
+      }
+      const opponentSource = R32_OPPONENT_SOURCE_FOR_THIRD_SLOT[matchNum];
+      if (!opponentSource) {
+        throw new Error(`No opponent source for R32 match ${matchNum}`);
+      }
+      return {
+        combination_line: combinationMeta.combinationLine,
+        qualifying_groups_key: combinationMeta.qualifyingKey,
+        excluded_groups_key: combinationMeta.excludedKey,
+        rank_pos: i + 1,
+        group_id: t.groupId,
+        team_id: t.teamId,
+        round_of_32_match_number: matchNum,
+        opponent_source: opponentSource,
+      };
+    });
+
+    const { error: insQualErr } = await supabase
+      .from('best_third_place_qualifiers')
+      .insert(qualifierRows);
+
+    if (insQualErr) {
+      log.warn({ err: insQualErr }, 'Could not insert best_third_place_qualifiers');
+    }
   }
 
   const resolveThirdForMatch = (matchNumber: number): string | null => {
@@ -176,7 +219,12 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
   }
 
   log.info(
-    { qualifyingThirds: qualifyingGroups.join(','), updatedRows },
+    {
+      qualifyingThirds: qualifyingGroups.join(','),
+      combinationLine: combinationMeta.combinationLine,
+      excludedGroups: combinationMeta.excludedKey,
+      updatedRows,
+    },
     'Round of 32 populated',
   );
   return updatedRows > 0;
