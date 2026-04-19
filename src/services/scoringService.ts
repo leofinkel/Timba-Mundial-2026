@@ -3,6 +3,7 @@ import 'server-only';
 import { SCORING_RULES } from '@/constants/scoring';
 import { GROUP_NAMES } from '@/constants/tournament';
 import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
+import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import type { UserScoreBreakdown } from '@/types/scoring';
@@ -76,8 +77,6 @@ const emptyBreakdown = (): MutableBreakdown => ({
 
 const outcomeSide = (hg: number, ag: number): 'home' | 'away' | 'draw' =>
   hg > ag ? 'home' : hg < ag ? 'away' : 'draw';
-
-const normName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const knockoutBucket = (stage: string): keyof MutableBreakdown | null => {
   switch (stage) {
@@ -350,13 +349,15 @@ const computeForPrediction = (params: {
   if (params.specials && rr) {
     if (
       rr.top_scorer &&
-      normName(params.specials.top_scorer) === normName(rr.top_scorer)
+      normalizeSpecialPredictionPlayerName(params.specials.top_scorer) ===
+        normalizeSpecialPredictionPlayerName(rr.top_scorer)
     ) {
       b.topScorerPoints += SCORING_RULES.honorBoard.topScorer;
     }
     if (
       rr.best_player &&
-      normName(params.specials.best_player) === normName(rr.best_player)
+      normalizeSpecialPredictionPlayerName(params.specials.best_player) ===
+        normalizeSpecialPredictionPlayerName(rr.best_player)
     ) {
       b.bestPlayerPoints += SCORING_RULES.honorBoard.bestPlayer;
     }

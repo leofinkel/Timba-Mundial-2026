@@ -52,7 +52,7 @@ export const SpecialPredictions = ({
             >
               https://www.transfermarkt.com
             </a>
-            .
+            . Para el puntaje no se distingue entre mayúsculas y minúsculas.
           </span>
         </p>
         <div className="space-y-2">

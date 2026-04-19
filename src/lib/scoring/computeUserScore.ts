@@ -1,5 +1,6 @@
 import { SCORING_RULES } from '@/constants/scoring';
 import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
+import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import type { MatchRow } from '@/repositories/matchRepository';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { GroupName } from '@/types/tournament';
@@ -229,8 +230,6 @@ export const scoreKnockoutRounds = (
   return acc;
 };
 
-const norm = (s: string) => s.trim().toLowerCase();
-
 export const scoreSpecialStrings = (
   predTop: string,
   predBest: string,
@@ -239,10 +238,18 @@ export const scoreSpecialStrings = (
   if (!real) return { top: 0, best: 0 };
   let top = 0;
   let best = 0;
-  if (real.top_scorer && norm(predTop) === norm(real.top_scorer)) {
+  if (
+    real.top_scorer &&
+    normalizeSpecialPredictionPlayerName(predTop) ===
+      normalizeSpecialPredictionPlayerName(real.top_scorer)
+  ) {
     top = SCORING_RULES.honorBoard.topScorer;
   }
-  if (real.best_player && norm(predBest) === norm(real.best_player)) {
+  if (
+    real.best_player &&
+    normalizeSpecialPredictionPlayerName(predBest) ===
+      normalizeSpecialPredictionPlayerName(real.best_player)
+  ) {
     best = SCORING_RULES.honorBoard.bestPlayer;
   }
   return { top, best };

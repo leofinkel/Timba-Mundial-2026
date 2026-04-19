@@ -431,18 +431,20 @@ BEGIN
       END IF;
     END IF;
 
-    -- Top scorer (case-insensitive comparison)
+    -- Top scorer: case-insensitive; trim; collapse internal whitespace (match app normalizer)
     IF v_real.top_scorer IS NOT NULL
        AND v_pred_special IS NOT NULL
-       AND lower(trim(v_pred_special.top_scorer)) = lower(trim(v_real.top_scorer))
+       AND lower(regexp_replace(trim(v_pred_special.top_scorer), '[[:space:]]+', ' ', 'g'))
+         = lower(regexp_replace(trim(v_real.top_scorer), '[[:space:]]+', ' ', 'g'))
     THEN
       v_scorer_pts := 100;
     END IF;
 
-    -- Best player (case-insensitive comparison)
+    -- Best player: same rules as top scorer
     IF v_real.best_player IS NOT NULL
        AND v_pred_special IS NOT NULL
-       AND lower(trim(v_pred_special.best_player)) = lower(trim(v_real.best_player))
+       AND lower(regexp_replace(trim(v_pred_special.best_player), '[[:space:]]+', ' ', 'g'))
+         = lower(regexp_replace(trim(v_real.best_player), '[[:space:]]+', ' ', 'g'))
     THEN
       v_player_pts := 100;
     END IF;
