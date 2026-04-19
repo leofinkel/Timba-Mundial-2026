@@ -1,6 +1,6 @@
 'use client';
 
-import { Star, Trophy } from 'lucide-react';
+import { Info, Star, Trophy } from 'lucide-react';
 
 import {
   Card,
@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { TRANSFERMARKT_PLAYER_NAMES_REFERENCE_URL } from '@/constants/prediction';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -35,6 +36,25 @@ export const SpecialPredictions = ({
         </div>
       </CardHeader>
       <CardContent className="grid gap-6 pt-6 sm:grid-cols-2">
+        <p className="col-span-full flex gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <Info
+            className="mt-0.5 size-4 shrink-0 text-amber-600/90"
+            aria-hidden
+          />
+          <span>
+            El nombre del jugador debe estar escrito exactamente igual a como
+            figura en la siguiente web:{' '}
+            <a
+              href={TRANSFERMARKT_PLAYER_NAMES_REFERENCE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline underline-offset-2 hover:text-primary/90"
+            >
+              https://www.transfermarkt.com
+            </a>
+            .
+          </span>
+        </p>
         <div className="space-y-2">
           <Label
             htmlFor="top-scorer"
