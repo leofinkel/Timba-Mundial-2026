@@ -14,20 +14,24 @@ export type ThirdPlaceResolutionContext = {
   standingsByGroup: Map<string, string[]>;
 };
 
+const sortStandingsByPosition = (rows: GroupStanding[]): GroupStanding[] =>
+  [...rows].sort((a, b) => a.position - b.position);
+
 export const buildThirdPlaceResolutionFromStandings = (
   standings: Record<GroupName, GroupStanding[]>,
 ): ThirdPlaceResolutionContext => {
   const standingsByGroup = new Map<string, string[]>();
   for (const [g, rows] of Object.entries(standings)) {
+    const sorted = sortStandingsByPosition(rows);
     standingsByGroup.set(
       g,
-      rows.map((r) => r.team.id),
+      sorted.map((r) => r.team.id),
     );
   }
 
   const thirds = Object.entries(standings)
     .map(([groupId, rows]) => {
-      const third = rows[2];
+      const third = sortStandingsByPosition(rows).find((r) => r.position === 3);
       if (!third) return null;
       return buildThirdPlaceRow({
         groupId,

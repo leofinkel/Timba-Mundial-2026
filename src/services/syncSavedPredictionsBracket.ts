@@ -117,7 +117,10 @@ export const syncAllSavedPredictionsBracketLogic =
       const groupStandingsByGroup = tournament.groups.reduce(
         (acc, g) => {
           const rows = calculatedStandings[g.id];
-          if (rows?.length) acc[g.id] = rows.map((s) => s.team.id);
+          if (rows?.length) {
+            const sorted = [...rows].sort((a, b) => a.position - b.position);
+            acc[g.id] = sorted.map((s) => s.team.id);
+          }
           return acc;
         },
         {} as Record<GroupName, string[]>,
