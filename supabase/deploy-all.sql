@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS public.news_posts CASCADE;
 DROP TABLE IF EXISTS public.prediction_matches CASCADE;
 DROP TABLE IF EXISTS public.prediction_group_standings CASCADE;
 DROP TABLE IF EXISTS public.prediction_specials CASCADE;
+DROP TABLE IF EXISTS public.prediction_best_third_place_qualifiers CASCADE;
 DROP TABLE IF EXISTS public.predictions CASCADE;
 DROP TABLE IF EXISTS public.user_scores CASCADE;
 DROP TABLE IF EXISTS public.real_results CASCADE;
@@ -119,6 +120,8 @@ CREATE TABLE public.prediction_matches (
   home_goals INTEGER NOT NULL CHECK (home_goals >= 0),
   away_goals INTEGER NOT NULL CHECK (away_goals >= 0),
   winner_team_id TEXT REFERENCES public.teams (id),
+  pred_home_team_id TEXT REFERENCES public.teams (id),
+  pred_away_team_id TEXT REFERENCES public.teams (id),
   UNIQUE (prediction_id, match_id)
 );
 
@@ -139,6 +142,24 @@ CREATE TABLE public.prediction_specials (
   top_scorer TEXT NOT NULL,
   best_player TEXT NOT NULL,
   UNIQUE (prediction_id)
+);
+
+CREATE TABLE public.prediction_best_third_place_qualifiers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  prediction_id UUID NOT NULL REFERENCES public.predictions (id) ON DELETE CASCADE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  combination_line SMALLINT NOT NULL CHECK (
+    combination_line >= 1
+    AND combination_line <= 495
+  ),
+  qualifying_groups_key TEXT NOT NULL,
+  excluded_groups_key TEXT NOT NULL,
+  rank_pos SMALLINT NOT NULL CHECK (rank_pos >= 1 AND rank_pos <= 8),
+  group_id TEXT NOT NULL,
+  team_id TEXT NOT NULL REFERENCES public.teams (id),
+  round_of_32_match_number SMALLINT NOT NULL,
+  opponent_source TEXT NOT NULL,
+  UNIQUE (prediction_id, rank_pos)
 );
 
 CREATE TABLE public.user_scores (
@@ -211,6 +232,8 @@ CREATE INDEX idx_prediction_matches_match_id ON public.prediction_matches (match
 CREATE INDEX idx_prediction_group_standings_prediction_id ON public.prediction_group_standings (prediction_id);
 CREATE INDEX idx_prediction_group_standings_group_id ON public.prediction_group_standings (group_id);
 CREATE INDEX idx_prediction_specials_prediction_id ON public.prediction_specials (prediction_id);
+CREATE INDEX idx_prediction_best_third_prediction_id
+  ON public.prediction_best_third_place_qualifiers (prediction_id);
 CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_points DESC NULLS LAST);
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
@@ -269,6 +292,7 @@ ALTER TABLE public.predictions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prediction_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prediction_group_standings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prediction_specials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prediction_best_third_place_qualifiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.real_group_standings ENABLE ROW LEVEL SECURITY;
@@ -296,6 +320,8 @@ CREATE POLICY "predictions_delete_own_or_admin" ON public.predictions FOR DELETE
 CREATE POLICY "prediction_matches_own_or_admin" ON public.prediction_matches FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
 CREATE POLICY "prediction_group_standings_own_or_admin" ON public.prediction_group_standings FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
 CREATE POLICY "prediction_specials_own_or_admin" ON public.prediction_specials FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
+
+CREATE POLICY "prediction_best_third_own_or_admin" ON public.prediction_best_third_place_qualifiers FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
 
 CREATE POLICY "user_scores_select_own_or_admin" ON public.user_scores FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.is_admin());
 CREATE POLICY "user_scores_write_admin" ON public.user_scores FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());

@@ -20,6 +20,8 @@ export type PredictionMatchRow = {
   home_goals: number;
   away_goals: number;
   winner_team_id: string | null;
+  pred_home_team_id?: string | null;
+  pred_away_team_id?: string | null;
 };
 
 export const getPredictionByUserId = async (
@@ -192,7 +194,9 @@ export const listPredictionMatchesWithMatches = async (
 ): Promise<Array<PredictionMatchRow & { matches: MatchJoinRow }>> => {
   const { data, error } = await supabase
     .from('prediction_matches')
-    .select('id, prediction_id, match_id, home_goals, away_goals, winner_team_id, matches ( id, stage, home_team_id, away_team_id )')
+    .select(
+      'id, prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id, matches ( id, stage, home_team_id, away_team_id )',
+    )
     .eq('prediction_id', predictionId);
 
   if (error) throw new Error(`prediction_matches.select join failed: ${error.message}`);
@@ -207,6 +211,58 @@ export const listPredictionMatchesWithMatches = async (
   });
 };
 
+export const replacePredictionBestThirdQualifiers = async (
+  supabase: SupabaseClient,
+  predictionId: string,
+  rows: Array<{
+    combination_line: number;
+    qualifying_groups_key: string;
+    excluded_groups_key: string;
+    rank_pos: number;
+    group_id: string;
+    team_id: string;
+    round_of_32_match_number: number;
+    opponent_source: string;
+  }>,
+): Promise<void> => {
+  const { error: delError } = await supabase
+    .from('prediction_best_third_place_qualifiers')
+    .delete()
+    .eq('prediction_id', predictionId);
+
+  if (delError) {
+    throw new Error(
+      `prediction_best_third_place_qualifiers.delete failed: ${delError.message}`,
+    );
+  }
+
+  if (rows.length === 0) return;
+
+  const now = new Date().toISOString();
+  const withParent = rows.map((r) => ({
+    prediction_id: predictionId,
+    updated_at: now,
+    combination_line: r.combination_line,
+    qualifying_groups_key: r.qualifying_groups_key,
+    excluded_groups_key: r.excluded_groups_key,
+    rank_pos: r.rank_pos,
+    group_id: r.group_id,
+    team_id: r.team_id,
+    round_of_32_match_number: r.round_of_32_match_number,
+    opponent_source: r.opponent_source,
+  }));
+
+  const { error: insError } = await supabase
+    .from('prediction_best_third_place_qualifiers')
+    .insert(withParent);
+
+  if (insError) {
+    throw new Error(
+      `prediction_best_third_place_qualifiers.insert failed: ${insError.message}`,
+    );
+  }
+};
+
 export const upsertPredictionMatch = async (
   supabase: SupabaseClient,
   row: {
@@ -215,6 +271,8 @@ export const upsertPredictionMatch = async (
     home_goals: number;
     away_goals: number;
     winner_team_id: string | null;
+    pred_home_team_id?: string | null;
+    pred_away_team_id?: string | null;
   },
 ): Promise<void> => {
   const { error } = await supabase.from('prediction_matches').upsert(
@@ -224,6 +282,8 @@ export const upsertPredictionMatch = async (
       home_goals: row.home_goals,
       away_goals: row.away_goals,
       winner_team_id: row.winner_team_id,
+      pred_home_team_id: row.pred_home_team_id ?? null,
+      pred_away_team_id: row.pred_away_team_id ?? null,
     },
     { onConflict: 'prediction_id,match_id' },
   );

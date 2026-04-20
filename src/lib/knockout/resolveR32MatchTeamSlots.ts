@@ -16,7 +16,7 @@ export type ThirdPlaceResolutionContext = {
   standingsByGroup: Map<string, string[]>;
 };
 
-const sortStandingsByPosition = (rows: GroupStanding[]): GroupStanding[] =>
+export const sortStandingsByPosition = (rows: GroupStanding[]): GroupStanding[] =>
   [...rows].sort((a, b) => a.position - b.position);
 
 export const buildThirdPlaceResolutionFromStandings = (

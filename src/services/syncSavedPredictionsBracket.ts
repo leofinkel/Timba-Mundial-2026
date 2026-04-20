@@ -3,14 +3,8 @@ import 'server-only';
 import type { GroupMatchScoresInput } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import { buildCalculatedStandingsForPrediction } from '@/lib/fixture/buildCalculatedStandingsForPrediction';
 import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
-import {
-  fillKnockoutHomeAwayAfterR32,
-  type KnockoutSlotResolutionContext,
-} from '@/lib/knockout/fillKnockoutHomeAwayAfterR32';
-import {
-  buildThirdPlaceResolutionFromStandings,
-  resolveR32MatchTeamSlotsFromStandings,
-} from '@/lib/knockout/resolveR32MatchTeamSlots';
+import { buildPredictionBestThirdQualifierRows } from '@/lib/knockout/buildPredictionBestThirdQualifierRows';
+import { resolvePredictionKnockoutBracket } from '@/lib/knockout/resolvePredictionKnockoutBracket';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
@@ -56,10 +50,9 @@ export const syncAllSavedPredictionsBracketLogic =
       tournament.groups.flatMap((g) => g.matches.map((m) => m.id)),
     );
 
-    const matchNumberToId = new Map<number, string>();
-    for (const m of tournament.knockoutMatches) {
-      matchNumberToId.set(m.matchNumber, m.id);
-    }
+    const matchNumberToId = new Map<number, string>(
+      tournament.knockoutMatches.map((m) => [m.matchNumber, m.id]),
+    );
 
     const { data: predictions, error: predErr } = await supabase
       .from('predictions')
@@ -80,7 +73,7 @@ export const syncAllSavedPredictionsBracketLogic =
 
       const { data: pmRows, error: pmErr } = await supabase
         .from('prediction_matches')
-        .select('match_id, home_goals, away_goals, winner_team_id')
+        .select('match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id')
         .eq('prediction_id', predictionId);
 
       if (pmErr) {
@@ -132,72 +125,50 @@ export const syncAllSavedPredictionsBracketLogic =
         groupStandingsByGroup,
       );
 
-      const r32Slots = resolveR32MatchTeamSlotsFromStandings(
-        tournament.knockoutMatches,
+      try {
+        await predictionRepository.replacePredictionBestThirdQualifiers(
+          supabase,
+          predictionId,
+          buildPredictionBestThirdQualifierRows(calculatedStandings),
+        );
+      } catch (e) {
+        log.warn(
+          { predictionId, err: e instanceof Error ? e.message : String(e) },
+          'prediction_best_third_place_qualifiers sync skipped',
+        );
+      }
+
+      const pmByMatchId = new Map((pmRows ?? []).map((r) => [r.match_id, r] as const));
+
+      const resolved = resolvePredictionKnockoutBracket({
+        knockoutMatches: tournament.knockoutMatches,
+        groupMatchIds,
         calculatedStandings,
-      );
-      const tp = buildThirdPlaceResolutionFromStandings(calculatedStandings);
-
-      const pmByMatchId = new Map(
-        (pmRows ?? []).map((r) => [r.match_id, r] as const),
-      );
-
-      const winnerByMatchId = new Map<string, string>();
-      for (const row of pmRows ?? []) {
-        if (groupMatchIds.has(row.match_id)) continue;
-        if (row.winner_team_id) winnerByMatchId.set(row.match_id, row.winner_team_id);
-      }
-
-      const homeAwayByMatchId = new Map<string, { home: string; away: string }>();
-      for (const [id, slots] of Object.entries(r32Slots)) {
-        homeAwayByMatchId.set(id, { home: slots.homeTeamId, away: slots.awayTeamId });
-      }
-
-      const initialWinners = new Map<string, string | null>();
-      for (const m of tournament.knockoutMatches) {
-        const row = pmByMatchId.get(m.id);
-        initialWinners.set(m.id, row?.winner_team_id ?? null);
-      }
-
-      const ctx: KnockoutSlotResolutionContext = {
-        standingsByGroup: tp.standingsByGroup,
-        thirdTeamByGroup: tp.thirdTeamByGroup,
-        allocation: tp.allocation,
-        winnerByMatchId,
-        homeAwayByMatchId,
+        predictionMatchRows: (pmRows ?? []).map((r) => ({
+          match_id: r.match_id,
+          home_goals: r.home_goals,
+          away_goals: r.away_goals,
+          winner_team_id: r.winner_team_id,
+        })),
         matchNumberToId,
-      };
+      });
 
-      let iterationCleared = 0;
-      for (let iter = 0; iter < 16; iter += 1) {
-        fillKnockoutHomeAwayAfterR32(tournament.knockoutMatches, ctx);
-        let changed = false;
-        for (const m of tournament.knockoutMatches) {
-          const wid = winnerByMatchId.get(m.id);
-          if (!wid) continue;
-          const ha = ctx.homeAwayByMatchId.get(m.id);
-          if (!ha || (wid !== ha.home && wid !== ha.away)) {
-            winnerByMatchId.delete(m.id);
-            changed = true;
-            iterationCleared += 1;
-          }
-        }
-        if (!changed) break;
-      }
-      clearedInvalidWinners += iterationCleared;
+      clearedInvalidWinners += resolved.clearedInvalidWinners;
 
       for (const m of tournament.knockoutMatches) {
         const row = pmByMatchId.get(m.id);
-        if (!row) continue;
-        const before = initialWinners.get(m.id) ?? null;
-        const after = winnerByMatchId.get(m.id) ?? null;
-        if (before === after) continue;
+        const ha = resolved.homeAwayByMatchId.get(m.id);
+        const haHome = ha?.home?.trim() ? ha.home : null;
+        const haAway = ha?.away?.trim() ? ha.away : null;
+
         await predictionRepository.upsertPredictionMatch(supabase, {
           prediction_id: predictionId,
           match_id: m.id,
-          home_goals: row.home_goals,
-          away_goals: row.away_goals,
-          winner_team_id: after,
+          home_goals: row?.home_goals ?? 0,
+          away_goals: row?.away_goals ?? 0,
+          winner_team_id: resolved.winnerByMatchId.get(m.id) ?? null,
+          pred_home_team_id: haHome,
+          pred_away_team_id: haAway,
         });
       }
 
