@@ -7,10 +7,12 @@ import {
   lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
   resolveDirectSource,
+  resolveThirdPlaceTeamForR32Match,
 } from '@/lib/knockout/thirdPlaceAllocation';
 import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
 import {
   getThirdPlaceCombinationMeta,
+  normalizeThirdPlaceGroupId,
   R32_OPPONENT_SOURCE_FOR_THIRD_SLOT,
 } from '@/lib/knockout/thirdPlaceCombinationMeta';
 import { createServerClient } from '@/lib/supabase/server';
@@ -85,8 +87,9 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
   const standingsByGroup = new Map<string, string[]>();
   for (const s of typedStandings) {
-    if (!standingsByGroup.has(s.group_id)) standingsByGroup.set(s.group_id, []);
-    const arr = standingsByGroup.get(s.group_id)!;
+    const gid = normalizeThirdPlaceGroupId(s.group_id);
+    if (!standingsByGroup.has(gid)) standingsByGroup.set(gid, []);
+    const arr = standingsByGroup.get(gid)!;
     arr[s.position - 1] = s.team_id;
   }
 
@@ -108,13 +111,15 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const qualifyingGroups = qualifying.map((t) =>
+    normalizeThirdPlaceGroupId(t.groupId),
+  );
   const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
   const combinationMeta = getThirdPlaceCombinationMeta(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) {
-    thirdTeamByGroup.set(t.groupId, t.teamId);
+    thirdTeamByGroup.set(normalizeThirdPlaceGroupId(t.groupId), t.teamId);
   }
 
   const { data: r32Matches, error: r32Err } = await supabase
@@ -139,7 +144,7 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
     log.warn({ err: delQualErr }, 'Could not clear best_third_place_qualifiers (table missing?)');
   } else {
     const qualifierRows = qualifying.map((t, i) => {
-      const matchNum = allocation.get(t.groupId);
+      const matchNum = allocation.get(normalizeThirdPlaceGroupId(t.groupId));
       if (matchNum == null) {
         throw new Error(`No matrix slot for third of group ${t.groupId}`);
       }
@@ -168,13 +173,6 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
     }
   }
 
-  const resolveThirdForMatch = (matchNumber: number): string | null => {
-    for (const [group, matchNum] of allocation) {
-      if (matchNum === matchNumber) return thirdTeamByGroup.get(group) ?? null;
-    }
-    return null;
-  };
-
   let updatedRows = 0;
 
   for (const m of r32Matches) {
@@ -187,7 +185,11 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
     if (m.home_source) {
       if (isThirdPlaceKnockoutSource(m.home_source)) {
-        homeComputed = resolveThirdForMatch(m.match_number);
+        homeComputed = resolveThirdPlaceTeamForR32Match(
+          allocation,
+          thirdTeamByGroup,
+          m.match_number,
+        );
       } else {
         homeComputed = resolveDirectSource(m.home_source, standingsByGroup);
       }
@@ -195,7 +197,11 @@ export const populateRoundOf32 = async (): Promise<boolean> => {
 
     if (m.away_source) {
       if (isThirdPlaceKnockoutSource(m.away_source)) {
-        awayComputed = resolveThirdForMatch(m.match_number);
+        awayComputed = resolveThirdPlaceTeamForR32Match(
+          allocation,
+          thirdTeamByGroup,
+          m.match_number,
+        );
       } else {
         awayComputed = resolveDirectSource(m.away_source, standingsByGroup);
       }

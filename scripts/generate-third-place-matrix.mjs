@@ -1,6 +1,9 @@
 /**
- * Regenerates src/constants/thirdPlaceBracketMatrix.ts from Wikipedia wikitext
- * (Template:2026 FIFA World Cup third-place_table) — same table as FIFA Annex C layout.
+ * Optional: regenerates `thirdPlaceBracketMatrix.ts` from English Wikipedia wikitext
+ * (Template:2026 FIFA World Cup third-place_table). Useful for cross-checks only.
+ *
+ * Canonical source in this repo is FIFA's table in `Tabla combinaciones tercer puesto.xlsx`
+ * (compare/validate with `scripts/verify-third-place-matrix.ts` and `scripts/parse-third-xlsx.mjs`).
  *
  * Usage: node scripts/generate-third-place-matrix.mjs [path-to-raw-wikitext.txt]
  */
@@ -112,7 +115,7 @@ const main = () => {
 
   const json = JSON.stringify(matrix);
   const outPath = path.join(root, 'src', 'constants', 'thirdPlaceBracketMatrix.ts');
-  const fileBody = `/** Auto-generated from FIFA/Wikipedia 2026 third-place table (495 rows). Run: node scripts/generate-third-place-matrix.mjs */\nexport const THIRD_PLACE_COMBINATION_MATRIX: Readonly<Record<string, Readonly<Record<string, number>>>> = ${json} as const;\n`;
+  const fileBody = `/** See repo root: Tabla combinaciones tercer puesto.xlsx + scripts/verify-third-place-matrix.ts. This file was produced by generate-third-place-matrix.mjs (wikitext). */\nexport const THIRD_PLACE_COMBINATION_MATRIX: Readonly<Record<string, Readonly<Record<string, number>>>> = ${json} as const;\n`;
   fs.writeFileSync(outPath, fileBody, 'utf8');
   console.log('Wrote', outPath, 'keys:', Object.keys(matrix).length);
 };

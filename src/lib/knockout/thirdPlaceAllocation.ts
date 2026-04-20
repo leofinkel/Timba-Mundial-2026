@@ -7,7 +7,10 @@
  */
 
 import { THIRD_PLACE_COMBINATION_MATRIX } from '@/constants/thirdPlaceBracketMatrix';
-import { qualifyingGroupsKey } from '@/lib/knockout/thirdPlaceCombinationMeta';
+import {
+  normalizeThirdPlaceGroupId,
+  qualifyingGroupsKey,
+} from '@/lib/knockout/thirdPlaceCombinationMeta';
 
 const DEFAULT_FIFA_RANK_FALLBACK = 999;
 
@@ -89,7 +92,45 @@ export const lookupOfficialThirdPlaceAllocation = (
   if (!row) {
     throw new Error(`No third-place matrix row for combination "${key}"`);
   }
-  return new Map(Object.entries(row).map(([g, n]) => [g, n]));
+  return new Map(
+    Object.entries(row).map(([g, n]) => [
+      normalizeThirdPlaceGroupId(g),
+      Number(n),
+    ]),
+  );
+};
+
+/**
+ * Which group's best-third team plays the third-place slot in a given R32 match
+ * (inverse of {@link lookupOfficialThirdPlaceAllocation}).
+ */
+export const buildR32MatchNumberToThirdPlaceGroup = (
+  allocation: Map<string, number>,
+): Map<number, string> => {
+  const inv = new Map<number, string>();
+  for (const [group, mn] of allocation) {
+    inv.set(Number(mn), group);
+  }
+  return inv;
+};
+
+/**
+ * Resolves the team id for the best-third slot in a Round-of-32 match.
+ * `matchNumber` may be string (e.g. from JSON/DB); allocation values are always numeric.
+ */
+export const resolveThirdPlaceTeamForR32Match = (
+  allocation: Map<string, number>,
+  thirdTeamByGroup: Map<string, string>,
+  matchNumber: number | string,
+): string | null => {
+  const target = Number(matchNumber);
+  if (Number.isNaN(target)) return null;
+  for (const [group, mn] of allocation) {
+    if (Number(mn) === target) {
+      return thirdTeamByGroup.get(group) ?? null;
+    }
+  }
+  return null;
 };
 
 /**
@@ -160,7 +201,7 @@ export const resolveDirectSource = (
   const m = source.match(/^([12])([A-L])$/);
   if (!m) return null;
   const position = parseInt(m[1], 10);
-  const groupId = m[2];
+  const groupId = normalizeThirdPlaceGroupId(m[2]);
   const order = standingsByGroup.get(groupId);
   if (!order || order.length < position) return null;
   return order[position - 1] ?? null;
@@ -187,12 +228,14 @@ export const buildRoundOf32Allocation = (
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const qualifyingGroups = qualifying.map((t) =>
+    normalizeThirdPlaceGroupId(t.groupId),
+  );
   const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
   for (const t of qualifying) {
-    thirdTeamByGroup.set(t.groupId, t.teamId);
+    thirdTeamByGroup.set(normalizeThirdPlaceGroupId(t.groupId), t.teamId);
   }
 
   const result = new Map<
@@ -228,12 +271,11 @@ export const buildRoundOf32Allocation = (
     let awayTeamId: string | null = null;
 
     if (s.awaySrc === '3' || s.awaySrc.startsWith('3-')) {
-      for (const [group, matchNum] of allocation) {
-        if (matchNum === s.matchNumber) {
-          awayTeamId = thirdTeamByGroup.get(group) ?? null;
-          break;
-        }
-      }
+      awayTeamId = resolveThirdPlaceTeamForR32Match(
+        allocation,
+        thirdTeamByGroup,
+        s.matchNumber,
+      );
     } else {
       awayTeamId = resolveDirectSource(s.awaySrc, standingsByGroup);
     }

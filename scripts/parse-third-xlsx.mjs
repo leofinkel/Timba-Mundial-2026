@@ -1,3 +1,8 @@
+/**
+ * Compares `Tabla combinaciones tercer puesto.xlsx` (FIFA) against
+ * `src/constants/thirdPlaceBracketMatrix.ts`. Unzip the xlsx to `xlsx_extract/` first.
+ * This is the spreadsheet-aligned check; Wikipedia is not involved.
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

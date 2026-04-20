@@ -4,8 +4,10 @@ import {
   lookupOfficialThirdPlaceAllocation,
   rankThirdPlaceTeams,
   resolveDirectSource,
+  resolveThirdPlaceTeamForR32Match,
 } from '@/lib/knockout/thirdPlaceAllocation';
 import type { ThirdPlaceTeam } from '@/lib/knockout/thirdPlaceAllocation';
+import { normalizeThirdPlaceGroupId } from '@/lib/knockout/thirdPlaceCombinationMeta';
 import type { GroupName, GroupStanding, KnockoutMatch } from '@/types/tournament';
 
 export type ThirdPlaceResolutionContext = {
@@ -24,7 +26,7 @@ export const buildThirdPlaceResolutionFromStandings = (
   for (const [g, rows] of Object.entries(standings)) {
     const sorted = sortStandingsByPosition(rows);
     standingsByGroup.set(
-      g,
+      normalizeThirdPlaceGroupId(g),
       sorted.map((r) => r.team.id),
     );
   }
@@ -48,11 +50,15 @@ export const buildThirdPlaceResolutionFromStandings = (
 
   const ranked = rankThirdPlaceTeams(thirds);
   const qualifying = ranked.slice(0, 8);
-  const qualifyingGroups = qualifying.map((t) => t.groupId);
+  const qualifyingGroups = qualifying.map((t) =>
+    normalizeThirdPlaceGroupId(t.groupId),
+  );
   const allocation = lookupOfficialThirdPlaceAllocation(qualifyingGroups);
 
   const thirdTeamByGroup = new Map<string, string>();
-  for (const t of qualifying) thirdTeamByGroup.set(t.groupId, t.teamId);
+  for (const t of qualifying) {
+    thirdTeamByGroup.set(normalizeThirdPlaceGroupId(t.groupId), t.teamId);
+  }
 
   return { allocation, thirdTeamByGroup, standingsByGroup };
 };
@@ -77,12 +83,12 @@ export const resolveR32MatchTeamSlotsFromStandings = (
 
     if (m.homeSource) {
       if (isThirdPlaceKnockoutSource(m.homeSource)) {
-        for (const [group, matchNum] of allocation) {
-          if (matchNum === m.matchNumber) {
-            homeTeamId = thirdTeamByGroup.get(group) ?? '';
-            break;
-          }
-        }
+        homeTeamId =
+          resolveThirdPlaceTeamForR32Match(
+            allocation,
+            thirdTeamByGroup,
+            m.matchNumber,
+          ) ?? '';
       } else {
         homeTeamId = resolveDirectSource(m.homeSource, standingsByGroup) ?? '';
       }
@@ -90,12 +96,12 @@ export const resolveR32MatchTeamSlotsFromStandings = (
 
     if (m.awaySource) {
       if (isThirdPlaceKnockoutSource(m.awaySource)) {
-        for (const [group, matchNum] of allocation) {
-          if (matchNum === m.matchNumber) {
-            awayTeamId = thirdTeamByGroup.get(group) ?? '';
-            break;
-          }
-        }
+        awayTeamId =
+          resolveThirdPlaceTeamForR32Match(
+            allocation,
+            thirdTeamByGroup,
+            m.matchNumber,
+          ) ?? '';
       } else {
         awayTeamId = resolveDirectSource(m.awaySource, standingsByGroup) ?? '';
       }

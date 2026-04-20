@@ -1,4 +1,8 @@
-import { isThirdPlaceKnockoutSource, resolveDirectSource } from '@/lib/knockout/thirdPlaceAllocation';
+import {
+  isThirdPlaceKnockoutSource,
+  resolveDirectSource,
+  resolveThirdPlaceTeamForR32Match,
+} from '@/lib/knockout/thirdPlaceAllocation';
 import type { KnockoutMatch } from '@/types/tournament';
 
 export type KnockoutSlotResolutionContext = {
@@ -37,12 +41,13 @@ export const resolveKnockoutSourceToTeamId = (
   }
 
   if (isThirdPlaceKnockoutSource(s)) {
-    for (const [group, mn] of ctx.allocation) {
-      if (mn === slotMatchNumber) {
-        return ctx.thirdTeamByGroup.get(group) ?? '';
-      }
-    }
-    return '';
+    return (
+      resolveThirdPlaceTeamForR32Match(
+        ctx.allocation,
+        ctx.thirdTeamByGroup,
+        slotMatchNumber,
+      ) ?? ''
+    );
   }
 
   return resolveDirectSource(s, ctx.standingsByGroup) ?? '';
