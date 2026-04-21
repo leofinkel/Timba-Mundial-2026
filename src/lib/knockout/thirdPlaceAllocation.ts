@@ -190,7 +190,7 @@ export const solveBipartiteMatching = (
   return result;
 };
 
-/** DB uses `3-ABCDF` placeholders; `3` alone is accepted for legacy rows. */
+/** Canonical third-place knockout slot is `3`; `3-*` suffixes are legacy only. */
 export const isThirdPlaceKnockoutSource = (src: string | null | undefined): boolean =>
   !!src && (src === '3' || src.startsWith('3-'));
 

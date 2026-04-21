@@ -523,20 +523,20 @@ ON CONFLICT (match_number) DO UPDATE SET
 -- Round of 32 (16 matches)
 INSERT INTO public.matches (match_number, stage, group_id, matchday, home_team_id, away_team_id, home_source, away_source, played_at) VALUES
   (73, 'round-of-32', NULL, NULL, NULL, NULL, '2A', '2B', '2026-06-28 21:00:00+00'),
-  (74, 'round-of-32', NULL, NULL, NULL, NULL, '1E', '3-ABCDF', '2026-06-29 22:30:00+00'),
+  (74, 'round-of-32', NULL, NULL, NULL, NULL, '1E', '3', '2026-06-29 22:30:00+00'),
   (75, 'round-of-32', NULL, NULL, NULL, NULL, '1F', '2C', '2026-06-30 03:00:00+00'),
   (76, 'round-of-32', NULL, NULL, NULL, NULL, '1C', '2F', '2026-06-29 19:00:00+00'),
-  (77, 'round-of-32', NULL, NULL, NULL, NULL, '1I', '3-CDFGH', '2026-06-30 23:00:00+00'),
+  (77, 'round-of-32', NULL, NULL, NULL, NULL, '1I', '3', '2026-06-30 23:00:00+00'),
   (78, 'round-of-32', NULL, NULL, NULL, NULL, '2E', '2I', '2026-06-30 19:00:00+00'),
-  (79, 'round-of-32', NULL, NULL, NULL, NULL, '1A', '3-CEFHI', '2026-07-01 03:00:00+00'),
-  (80, 'round-of-32', NULL, NULL, NULL, NULL, '1L', '3-EHIJK', '2026-07-01 18:00:00+00'),
-  (81, 'round-of-32', NULL, NULL, NULL, NULL, '1D', '3-BEFIJ', '2026-07-02 02:00:00+00'),
-  (82, 'round-of-32', NULL, NULL, NULL, NULL, '1G', '3-AEHIJ', '2026-07-01 22:00:00+00'),
+  (79, 'round-of-32', NULL, NULL, NULL, NULL, '1A', '3', '2026-07-01 03:00:00+00'),
+  (80, 'round-of-32', NULL, NULL, NULL, NULL, '1L', '3', '2026-07-01 18:00:00+00'),
+  (81, 'round-of-32', NULL, NULL, NULL, NULL, '1D', '3', '2026-07-02 02:00:00+00'),
+  (82, 'round-of-32', NULL, NULL, NULL, NULL, '1G', '3', '2026-07-01 22:00:00+00'),
   (83, 'round-of-32', NULL, NULL, NULL, NULL, '2K', '2L', '2026-07-03 01:00:00+00'),
   (84, 'round-of-32', NULL, NULL, NULL, NULL, '1H', '2J', '2026-07-02 21:00:00+00'),
-  (85, 'round-of-32', NULL, NULL, NULL, NULL, '1B', '3-EFGIJ', '2026-07-03 05:00:00+00'),
+  (85, 'round-of-32', NULL, NULL, NULL, NULL, '1B', '3', '2026-07-03 05:00:00+00'),
   (86, 'round-of-32', NULL, NULL, NULL, NULL, '1J', '2H', '2026-07-04 00:00:00+00'),
-  (87, 'round-of-32', NULL, NULL, NULL, NULL, '1K', '3-DEIJL', '2026-07-04 03:30:00+00'),
+  (87, 'round-of-32', NULL, NULL, NULL, NULL, '1K', '3', '2026-07-04 03:30:00+00'),
   (88, 'round-of-32', NULL, NULL, NULL, NULL, '2D', '2G', '2026-07-03 20:00:00+00')
 ON CONFLICT (match_number) DO UPDATE SET
   stage = EXCLUDED.stage, group_id = EXCLUDED.group_id, matchday = EXCLUDED.matchday,
