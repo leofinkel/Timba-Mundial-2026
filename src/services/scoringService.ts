@@ -1,11 +1,10 @@
 import 'server-only';
 
 import { SCORING_RULES } from '@/constants/scoring';
-import { GROUP_NAMES } from '@/constants/tournament';
-import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
+import { listAllRealGroupStandings } from '@/repositories/realGroupStandingsRepository';
 import type { UserScoreBreakdown } from '@/types/scoring';
 
 const log = createServiceLogger('scoringService');
@@ -116,116 +115,26 @@ const knockoutUnitPoints = (stage: string): number => {
   }
 };
 
-type TeamAcc = {
-  teamId: string;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  gf: number;
-  ga: number;
-  pts: number;
-};
-
-const bumpTable = (
-  table: Map<string, TeamAcc>,
-  homeId: string,
-  awayId: string,
-  hg: number,
-  ag: number,
-) => {
-  const home =
-    table.get(homeId) ??
-    ({
-      teamId: homeId,
-      played: 0,
-      won: 0,
-      drawn: 0,
-      lost: 0,
-      gf: 0,
-      ga: 0,
-      pts: 0,
-    } satisfies TeamAcc);
-  const away =
-    table.get(awayId) ??
-    ({
-      teamId: awayId,
-      played: 0,
-      won: 0,
-      drawn: 0,
-      lost: 0,
-      gf: 0,
-      ga: 0,
-      pts: 0,
-    } satisfies TeamAcc);
-
-  home.played += 1;
-  away.played += 1;
-  home.gf += hg;
-  home.ga += ag;
-  away.gf += ag;
-  away.ga += hg;
-
-  if (hg > ag) {
-    home.won += 1;
-    away.lost += 1;
-    home.pts += 3;
-  } else if (hg < ag) {
-    away.won += 1;
-    home.lost += 1;
-    away.pts += 3;
-  } else {
-    home.drawn += 1;
-    away.drawn += 1;
-    home.pts += 1;
-    away.pts += 1;
+/** Admin-saved 1–4 per group: only groups with exactly 4 rows count for scoring. */
+const buildAdminFinalGroupPositions = (
+  rows: { group_id: string; team_id: string; position: number }[],
+): Map<string, Map<string, number>> => {
+  const byGroup = new Map<string, { team_id: string; position: number }[]>();
+  for (const r of rows) {
+    const arr = byGroup.get(r.group_id) ?? [];
+    arr.push({ team_id: r.team_id, position: r.position });
+    byGroup.set(r.group_id, arr);
   }
-
-  table.set(homeId, home);
-  table.set(awayId, away);
-};
-
-const standingsOrderForGroup = (
-  groupId: string,
-  matches: MatchRow[],
-): string[] => {
-  const table = new Map<string, TeamAcc>();
-  const groupMatchScores: {
-    homeTeamId: string;
-    awayTeamId: string;
-    homeGoals: number;
-    awayGoals: number;
-  }[] = [];
-
-  for (const m of matches) {
-    if (m.stage !== 'group' || m.group_id !== groupId) {
-      continue;
+  const out = new Map<string, Map<string, number>>();
+  for (const [gid, arr] of byGroup) {
+    if (arr.length !== 4) continue;
+    const m = new Map<string, number>();
+    for (const row of arr) {
+      m.set(row.team_id, row.position);
     }
-    if (
-      m.home_goals === null ||
-      m.away_goals === null ||
-      !m.home_team_id ||
-      !m.away_team_id
-    ) {
-      continue;
-    }
-    bumpTable(table, m.home_team_id, m.away_team_id, m.home_goals, m.away_goals);
-    groupMatchScores.push({
-      homeTeamId: m.home_team_id,
-      awayTeamId: m.away_team_id,
-      homeGoals: m.home_goals,
-      awayGoals: m.away_goals,
-    });
+    out.set(gid, m);
   }
-
-  const overallRows = [...table.values()].map((r) => ({
-    teamId: r.teamId,
-    points: r.pts,
-    goalsFor: r.gf,
-    goalsAgainst: r.ga,
-  }));
-
-  return orderGroupStandings(overallRows, groupMatchScores).order;
+  return out;
 };
 
 const computeForPrediction = (params: {
@@ -235,6 +144,7 @@ const computeForPrediction = (params: {
   specials: SpecialRow | null;
   matches: MatchRow[];
   real: RealResultsRow | null;
+  adminFinalGroupPositions: Map<string, Map<string, number>>;
 }): MutableBreakdown => {
   const b = emptyBreakdown();
   const matchById = new Map(params.matches.map((m) => [m.id, m]));
@@ -274,15 +184,11 @@ const computeForPrediction = (params: {
     }
   }
 
-  for (const gid of GROUP_NAMES) {
-    const actualOrder = standingsOrderForGroup(gid, params.matches);
-    if (actualOrder.length === 0) {
-      continue;
-    }
+  for (const [gid, actualPosByTeam] of params.adminFinalGroupPositions) {
     const predicted = params.standings.filter((s) => s.group_id === gid);
     for (const s of predicted) {
-      const idx = s.position - 1;
-      if (idx >= 0 && actualOrder[idx] === s.team_id) {
+      const aPos = actualPosByTeam.get(s.team_id);
+      if (aPos != null && aPos === s.position) {
         b.groupPositionPoints += SCORING_RULES.groupPosition;
       }
     }
@@ -550,6 +456,9 @@ export const calculateAllScores = async (): Promise<{
       });
     }
 
+    const adminRows = await listAllRealGroupStandings(supabase);
+    const adminFinalGroupPositions = buildAdminFinalGroupPositions(adminRows);
+
     let updated = 0;
     for (const p of preds ?? []) {
       const b = computeForPrediction({
@@ -559,6 +468,7 @@ export const calculateAllScores = async (): Promise<{
         specials: spByPred.get(p.id) ?? null,
         matches: (matches ?? []) as MatchRow[],
         real: (real as RealResultsRow | null) ?? null,
+        adminFinalGroupPositions,
       });
 
       await persistUserScore(supabase, p.user_id, b);
@@ -645,6 +555,9 @@ export const calculateUserScore = async (
       throw new Error(spe.message);
     }
 
+    const adminRows = await listAllRealGroupStandings(supabase);
+    const adminFinalGroupPositions = buildAdminFinalGroupPositions(adminRows);
+
     const b = computeForPrediction({
       userId,
       predMatches: (pm ?? []) as PredMatchRow[],
@@ -652,6 +565,7 @@ export const calculateUserScore = async (
       specials: sp,
       matches: (matches ?? []) as MatchRow[],
       real: (real as RealResultsRow | null) ?? null,
+      adminFinalGroupPositions,
     });
 
     await persistUserScore(supabase, userId, b);

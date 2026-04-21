@@ -270,6 +270,7 @@ BEGIN
 
   -- =========================================================================
   -- 2) GROUP POSITION POINTS: 5 pts per team in correct final position
+  --    Only when admin saved final 1–4 in real_group_standings (4 rows/group).
   -- =========================================================================
   SELECT COALESCE(COUNT(*) * 5, 0)::INTEGER
   INTO v_group_pos_pts
@@ -278,7 +279,14 @@ BEGIN
     ON gs.group_id = pgs.group_id
     AND gs.team_id = pgs.team_id
     AND gs.position = pgs.position
-  WHERE pgs.prediction_id = v_prediction_id;
+  WHERE pgs.prediction_id = v_prediction_id
+    AND EXISTS (
+      SELECT 1
+      FROM public.real_group_standings r
+      WHERE r.group_id = pgs.group_id
+      GROUP BY r.group_id
+      HAVING COUNT(*) = 4
+    );
 
   -- =========================================================================
   -- 3) KNOCKOUT POINTS: correct advancing team per round

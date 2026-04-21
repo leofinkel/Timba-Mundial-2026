@@ -769,12 +769,19 @@ BEGIN
   WHERE pm.prediction_id = v_prediction_id AND m.stage = 'group'
     AND m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL;
 
-  -- 2) Group position points (5 per correct position)
+  -- 2) Group position points: only with admin-saved 1–4 (real_group_standings x4)
   SELECT COALESCE(COUNT(*) * 5, 0)::INTEGER INTO v_group_pos_pts
   FROM public.prediction_group_standings pgs
   JOIN public.group_standings gs
     ON gs.group_id = pgs.group_id AND gs.team_id = pgs.team_id AND gs.position = pgs.position
-  WHERE pgs.prediction_id = v_prediction_id;
+  WHERE pgs.prediction_id = v_prediction_id
+    AND EXISTS (
+      SELECT 1
+      FROM public.real_group_standings r
+      WHERE r.group_id = pgs.group_id
+      GROUP BY r.group_id
+      HAVING COUNT(*) = 4
+    );
 
   -- 3) Knockout: correct advancing team per round
   SELECT COALESCE(COUNT(*) * 10, 0)::INTEGER INTO v_r32_pts
