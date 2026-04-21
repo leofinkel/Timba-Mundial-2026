@@ -68,29 +68,42 @@ const mapRowsToUserPrediction = async (
     pred.id,
   );
 
+  const tournament = await getTournament();
+  const groupMatchIds = new Set(
+    tournament.groups.flatMap((g) => g.matches.map((m) => m.id)),
+  );
+  const matchNumberToId = new Map<number, string>(
+    tournament.knockoutMatches.map((m) => [m.matchNumber, m.id]),
+  );
+
   const groupPredictions: GroupMatchPrediction[] = [];
-  const knockoutPredictions: KnockoutMatchPrediction[] = [];
+  const groupPredictionsById: GroupMatchScoresInput = {};
+  const knockoutRowsByMatchId = new Map<
+    string,
+    {
+      home_goals: number;
+      away_goals: number;
+      winner_team_id: string | null;
+      pred_home_team_id?: string | null;
+      pred_away_team_id?: string | null;
+    }
+  >();
 
   for (const row of joined) {
     const m = row.matches;
     if (!m) continue;
     if (m.stage === 'group') {
+      groupPredictionsById[row.match_id] = {
+        homeGoals: row.home_goals,
+        awayGoals: row.away_goals,
+      };
       groupPredictions.push({
         matchId: row.match_id,
         homeGoals: row.home_goals,
         awayGoals: row.away_goals,
       });
     } else {
-      const ph = row.pred_home_team_id;
-      const pa = row.pred_away_team_id;
-      knockoutPredictions.push({
-        matchId: row.match_id,
-        homeTeamId: ph?.trim() ?? '',
-        awayTeamId: pa?.trim() ?? '',
-        homeGoals: row.home_goals,
-        awayGoals: row.away_goals,
-        winnerId: row.winner_team_id ?? '',
-      });
+      knockoutRowsByMatchId.set(row.match_id, row);
     }
   }
 
@@ -99,6 +112,47 @@ const mapRowsToUserPrediction = async (
     pred.id,
   );
   const standingsMap = buildStandingsMap(standingRows);
+  const manualOrder = Object.fromEntries(standingsMap) as Partial<
+    Record<GroupName, string[]>
+  >;
+
+  let resolvedKnockout:
+    | ReturnType<typeof resolvePredictionKnockoutBracket>
+    | null = null;
+  if (isGroupStagePredictionComplete(tournament.groups, groupPredictionsById)) {
+    const calculatedStandings = buildCalculatedStandingsForPrediction(
+      tournament,
+      groupPredictionsById,
+      manualOrder,
+    );
+    resolvedKnockout = resolvePredictionKnockoutBracket({
+      knockoutMatches: tournament.knockoutMatches,
+      groupMatchIds,
+      calculatedStandings,
+      predictionMatchRows: [...knockoutRowsByMatchId.entries()].map(([matchId, row]) => ({
+        match_id: matchId,
+        home_goals: row.home_goals,
+        away_goals: row.away_goals,
+        winner_team_id: row.winner_team_id,
+      })),
+      matchNumberToId,
+    });
+  }
+
+  const knockoutPredictions: KnockoutMatchPrediction[] = [];
+  for (const m of tournament.knockoutMatches) {
+    const row = knockoutRowsByMatchId.get(m.id);
+    if (!row) continue;
+    const resolvedHomeAway = resolvedKnockout?.homeAwayByMatchId.get(m.id);
+    knockoutPredictions.push({
+      matchId: m.id,
+      homeTeamId: resolvedHomeAway?.home?.trim() || row.pred_home_team_id?.trim() || '',
+      awayTeamId: resolvedHomeAway?.away?.trim() || row.pred_away_team_id?.trim() || '',
+      homeGoals: row.home_goals,
+      awayGoals: row.away_goals,
+      winnerId: resolvedKnockout?.winnerByMatchId.get(m.id) ?? row.winner_team_id ?? '',
+    });
+  }
 
   const specials = await predictionRepository.getPredictionSpecials(
     supabase,
