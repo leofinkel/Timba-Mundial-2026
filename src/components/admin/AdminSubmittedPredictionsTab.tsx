@@ -111,8 +111,8 @@ export const AdminSubmittedPredictionsTab = ({
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-4 py-3">
         <p className="text-sm text-zinc-300">
-          Tras cambiar la lógica de mejores terceros / bracket, sincronizá las planillas guardadas:
-          recalcula tablas de grupo, valida ganadores de eliminatoria y recalcula puntajes.
+          Tras cambiar la lógica del bracket, sincronizá las planillas guardadas: recalcula tablas de
+          grupo, valida ganadores de eliminatoria y recalcula puntajes.
         </p>
         <Button
           type="button"
