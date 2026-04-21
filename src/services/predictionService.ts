@@ -140,18 +140,67 @@ const mapRowsToUserPrediction = async (
   }
 
   const knockoutPredictions: KnockoutMatchPrediction[] = [];
+  const knockoutRowsToHeal: Array<{
+    matchId: string;
+    homeGoals: number;
+    awayGoals: number;
+    winnerTeamId: string | null;
+    predHomeTeamId: string | null;
+    predAwayTeamId: string | null;
+  }> = [];
   for (const m of tournament.knockoutMatches) {
     const row = knockoutRowsByMatchId.get(m.id);
     if (!row) continue;
     const resolvedHomeAway = resolvedKnockout?.homeAwayByMatchId.get(m.id);
+    const resolvedHomeTeamId =
+      resolvedHomeAway?.home?.trim() || row.pred_home_team_id?.trim() || '';
+    const resolvedAwayTeamId =
+      resolvedHomeAway?.away?.trim() || row.pred_away_team_id?.trim() || '';
+    const resolvedWinnerId =
+      resolvedKnockout?.winnerByMatchId.get(m.id) ?? row.winner_team_id ?? '';
+
     knockoutPredictions.push({
       matchId: m.id,
-      homeTeamId: resolvedHomeAway?.home?.trim() || row.pred_home_team_id?.trim() || '',
-      awayTeamId: resolvedHomeAway?.away?.trim() || row.pred_away_team_id?.trim() || '',
+      homeTeamId: resolvedHomeTeamId,
+      awayTeamId: resolvedAwayTeamId,
       homeGoals: row.home_goals,
       awayGoals: row.away_goals,
-      winnerId: resolvedKnockout?.winnerByMatchId.get(m.id) ?? row.winner_team_id ?? '',
+      winnerId: resolvedWinnerId,
     });
+
+    if (
+      resolvedKnockout &&
+      (row.pred_home_team_id !== (resolvedHomeTeamId || null) ||
+        row.pred_away_team_id !== (resolvedAwayTeamId || null) ||
+        row.winner_team_id !== (resolvedWinnerId || null))
+    ) {
+      knockoutRowsToHeal.push({
+        matchId: m.id,
+        homeGoals: row.home_goals,
+        awayGoals: row.away_goals,
+        winnerTeamId: resolvedWinnerId || null,
+        predHomeTeamId: resolvedHomeTeamId || null,
+        predAwayTeamId: resolvedAwayTeamId || null,
+      });
+    }
+  }
+
+  if (knockoutRowsToHeal.length > 0) {
+    for (const row of knockoutRowsToHeal) {
+      await predictionRepository.upsertPredictionMatch(supabase, {
+        prediction_id: pred.id,
+        match_id: row.matchId,
+        home_goals: row.homeGoals,
+        away_goals: row.awayGoals,
+        winner_team_id: row.winnerTeamId,
+        pred_home_team_id: row.predHomeTeamId,
+        pred_away_team_id: row.predAwayTeamId,
+      });
+    }
+    log.info(
+      { userId, predictionId: pred.id, healedMatches: knockoutRowsToHeal.length },
+      'mapRowsToUserPrediction: healed knockout slots from group-stage recalculation',
+    );
   }
 
   const specials = await predictionRepository.getPredictionSpecials(
