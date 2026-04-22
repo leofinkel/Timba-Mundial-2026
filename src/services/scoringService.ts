@@ -137,6 +137,28 @@ const buildAdminFinalGroupPositions = (
   return out;
 };
 
+/** Group position points only when every group-stage match in that group has a result. */
+const groupHasAllGroupMatchesPlayed = (matches: MatchRow[], groupId: string): boolean => {
+  const inGroup = matches.filter((m) => m.stage === 'group' && m.group_id === groupId);
+  if (inGroup.length === 0) return false;
+  return inGroup.every(
+    (m) => m.home_goals != null && m.away_goals != null,
+  );
+};
+
+const filterAdminGroupPositionsByCompleteGroups = (
+  admin: Map<string, Map<string, number>>,
+  matches: MatchRow[],
+): Map<string, Map<string, number>> => {
+  const out = new Map<string, Map<string, number>>();
+  for (const [gid, posMap] of admin) {
+    if (groupHasAllGroupMatchesPlayed(matches, gid)) {
+      out.set(gid, posMap);
+    }
+  }
+  return out;
+};
+
 const computeForPrediction = (params: {
   userId: string;
   predMatches: PredMatchRow[];
@@ -457,7 +479,11 @@ export const calculateAllScores = async (): Promise<{
     }
 
     const adminRows = await listAllRealGroupStandings(supabase);
-    const adminFinalGroupPositions = buildAdminFinalGroupPositions(adminRows);
+    const matchRows = (matches ?? []) as MatchRow[];
+    const adminFinalGroupPositions = filterAdminGroupPositionsByCompleteGroups(
+      buildAdminFinalGroupPositions(adminRows),
+      matchRows,
+    );
 
     let updated = 0;
     for (const p of preds ?? []) {
@@ -466,7 +492,7 @@ export const calculateAllScores = async (): Promise<{
         predMatches: pmByPred.get(p.id) ?? [],
         standings: gsByPred.get(p.id) ?? [],
         specials: spByPred.get(p.id) ?? null,
-        matches: (matches ?? []) as MatchRow[],
+        matches: matchRows,
         real: (real as RealResultsRow | null) ?? null,
         adminFinalGroupPositions,
       });
@@ -556,14 +582,18 @@ export const calculateUserScore = async (
     }
 
     const adminRows = await listAllRealGroupStandings(supabase);
-    const adminFinalGroupPositions = buildAdminFinalGroupPositions(adminRows);
+    const matchRows = (matches ?? []) as MatchRow[];
+    const adminFinalGroupPositions = filterAdminGroupPositionsByCompleteGroups(
+      buildAdminFinalGroupPositions(adminRows),
+      matchRows,
+    );
 
     const b = computeForPrediction({
       userId,
       predMatches: (pm ?? []) as PredMatchRow[],
       standings: gs ?? [],
       specials: sp,
-      matches: (matches ?? []) as MatchRow[],
+      matches: matchRows,
       real: (real as RealResultsRow | null) ?? null,
       adminFinalGroupPositions,
     });

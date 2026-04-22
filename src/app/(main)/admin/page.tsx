@@ -10,6 +10,8 @@ import {
   listGameRulesForAdmin,
   listSubmittedPredictionsForAdmin,
 } from '@/services/adminService';
+import { createServerClient } from '@/lib/supabase/server';
+import { getLatestRealResults } from '@/repositories/realResultsRepository';
 import { getTournament } from '@/services/fixtureService';
 import { listPublicNews } from '@/services/newsService';
 import { listRealGroupStandingsGrouped } from '@/services/realGroupStandingsService';
@@ -33,6 +35,7 @@ const AdminPage = async () => {
     tournament,
     news,
     groupStandingOverrides,
+    initialOfficialResults,
   ] = await Promise.all([
     getAllUsersAction(),
     getAdminDashboardAction(),
@@ -43,6 +46,10 @@ const AdminPage = async () => {
     getTournament(),
     listPublicNews(),
     listRealGroupStandingsGrouped(),
+    (async () => {
+      const supabase = await createServerClient();
+      return getLatestRealResults(supabase);
+    })(),
   ]);
 
   if (!usersRes.success || !usersRes.data) {
@@ -51,23 +58,6 @@ const AdminPage = async () => {
   if (!statsRes.success || !statsRes.data) {
     redirect('/dashboard');
   }
-
-  const teamMap = new Map(TEAMS.map((t) => [t.id, t.name]));
-  const matchOptions = matches.map((m) => {
-    const home = m.home_team_id ? (teamMap.get(m.home_team_id) ?? m.home_team_id) : 'TBD';
-    const away = m.away_team_id ? (teamMap.get(m.away_team_id) ?? m.away_team_id) : 'TBD';
-    const group = m.group_id ? ` · Grupo ${m.group_id}` : '';
-    return {
-      id: m.id,
-      label: `${home} vs ${away} · ${m.stage}${group}`,
-      homeGoals: m.home_goals,
-      awayGoals: m.away_goals,
-      stage: m.stage,
-      homeTeamId: m.home_team_id,
-      awayTeamId: m.away_team_id,
-      winnerTeamId: m.winner_team_id,
-    };
-  });
 
   const teams = TEAMS.map((t) => ({ id: t.id, name: t.name }));
 
@@ -85,7 +75,6 @@ const AdminPage = async () => {
       <AdminDashboardPanel
         users={usersRes.data}
         currentAdminId={userResult.data.id}
-        matchOptions={matchOptions}
         teams={teams}
         stats={statsRes.data}
         rules={rules}
@@ -95,6 +84,7 @@ const AdminPage = async () => {
         tournament={tournament}
         news={news}
         groupStandingOverrides={groupStandingOverrides}
+        initialOfficialResults={initialOfficialResults}
       />
     </div>
   );

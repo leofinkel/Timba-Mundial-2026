@@ -107,9 +107,9 @@ export const AdminGroupStandingsOverrideCard = ({
       <CardHeader>
         <CardTitle>Posiciones finales por grupo (override)</CardTitle>
         <CardDescription>
-          Si FIFA / desempates requieren un orden distinto al calculado por goles, definí 1.º a 4.º
-          acá. Solo aplica cuando hay exactamente 4 equipos asignados (reemplaza la tabla calculada
-          para puntos de posición y para el bracket automático).
+          Puntos por posición en la planilla: solo se suman cuando el grupo completó todos los
+          partidos (todos con resultado) y, además, este 1.º a 4.º quedó guardado. Si FIFA /
+          desempates requieren un orden distinto al calculado por goles, definilo acá.
           {hasOverride ? (
             <span className="ml-1 text-emerald-400">Este grupo tiene override activo.</span>
           ) : null}

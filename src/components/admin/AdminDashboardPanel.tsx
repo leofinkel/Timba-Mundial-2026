@@ -22,19 +22,9 @@ import type { MatchRow } from '@/repositories/matchRepository';
 import type { AdminClassificationEntry, AdminGameRule, AdminSubmittedPredictionUser } from '@/types/admin';
 import type { UserProfile } from '@/types/auth';
 import type { NewsPost } from '@/types/news';
+import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { GroupName, Tournament } from '@/types/tournament';
 import { ChevronDown } from 'lucide-react';
-
-interface MatchOption {
-  id: string;
-  label: string;
-  homeGoals: number | null;
-  awayGoals: number | null;
-  stage: string;
-  homeTeamId: string | null;
-  awayTeamId: string | null;
-  winnerTeamId: string | null;
-}
 
 interface TeamOption {
   id: string;
@@ -52,7 +42,6 @@ interface AdminDashboardPanelProps {
   users: UserProfile[];
   /** Logged-in admin; used to disable self-service moderation actions. */
   currentAdminId: string;
-  matchOptions: MatchOption[];
   teams: TeamOption[];
   stats: DashboardStatsPayload;
   rules: AdminGameRule[];
@@ -62,12 +51,12 @@ interface AdminDashboardPanelProps {
   tournament: Tournament;
   news: NewsPost[];
   groupStandingOverrides: Partial<Record<GroupName, string[]>>;
+  initialOfficialResults: RealResultsRow | null;
 }
 
 export const AdminDashboardPanel = ({
   users,
   currentAdminId,
-  matchOptions,
   teams,
   stats,
   rules,
@@ -77,6 +66,7 @@ export const AdminDashboardPanel = ({
   tournament,
   news,
   groupStandingOverrides,
+  initialOfficialResults,
 }: AdminDashboardPanelProps) => {
   const [activeTab, setActiveTab] = useState('payments');
   const isAbmSelected =
@@ -158,10 +148,10 @@ export const AdminDashboardPanel = ({
       </TabsContent>
       <TabsContent value="results" className="mt-6">
         <AdminResultsTab
-          matchOptions={matchOptions}
           teams={teams}
           tournament={tournament}
           groupStandingOverrides={groupStandingOverrides}
+          initialOfficialResults={initialOfficialResults}
         />
       </TabsContent>
       <TabsContent value="rules" className="mt-6">
