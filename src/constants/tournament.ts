@@ -12,7 +12,8 @@ export const TOTAL_MATCHES = 104 as const;
 /** 16 + 8 + 4 + 2 + 1 + 1 (dieciseisavos → final + tercer puesto) */
 export const KNOCKOUT_MATCHES_COUNT = 32 as const;
 
-export const PREDICTION_DEADLINE = '2026-05-25T23:59:59Z' as const;
+/** Fin del 25/05/2026 (23:59:59,999) en hora Argentina (UTC−3); límite de envío de la planilla. */
+export const PREDICTION_DEADLINE = '2026-05-25T23:59:59.999-03:00' as const;
 
 /**
  * Desde esta fecha/hora (inicio del 26 may 2026, hora Argentina UTC−3) los jugadores
