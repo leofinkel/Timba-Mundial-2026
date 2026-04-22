@@ -142,6 +142,12 @@ export const adminNewsPostSchema = z.object({
   body: z.string().min(5, 'Contenido demasiado corto').max(5000, 'Contenido demasiado largo'),
 });
 
+export const adminNewsPostUpdateSchema = z.object({
+  title: z.string().min(3, 'Título demasiado corto').max(200, 'Título demasiado largo'),
+  body: z.string().min(5, 'Contenido demasiado corto').max(5000, 'Contenido demasiado largo'),
+  isVisible: z.boolean(),
+});
+
 export type LoginSchemaInferred = z.infer<typeof loginSchema>;
 export type RegisterSchemaInferred = z.infer<typeof registerSchema>;
 export type GroupMatchPredictionSchemaInferred = z.infer<typeof groupMatchPredictionSchema>;
@@ -163,3 +169,4 @@ export type AdminClassificationUpdateSchemaInferred = z.infer<
   typeof adminClassificationUpdateSchema
 >;
 export type AdminNewsPostSchemaInferred = z.infer<typeof adminNewsPostSchema>;
+export type AdminNewsPostUpdateSchemaInferred = z.infer<typeof adminNewsPostUpdateSchema>;

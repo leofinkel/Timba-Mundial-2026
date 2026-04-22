@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Newspaper } from 'lucide-react';
 
+import { NewsPostImage } from '@/components/news/NewsPostImage';
 import type { NewsPost } from '@/types/news';
 
 interface NewsListProps {
@@ -34,12 +35,18 @@ export const NewsList = ({ news }: NewsListProps) => {
           >
             <h3 className="text-base font-semibold text-white">{post.title}</h3>
             <p className="mt-1 text-xs text-zinc-500">
-              {post.authorName} ·{' '}
               {format(new Date(post.createdAt), "d 'de' MMMM yyyy, HH:mm", { locale: es })}
             </p>
             <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-300">
               {post.body}
             </p>
+            {post.imagePath ? (
+              <NewsPostImage
+                className="mt-3 rounded-md"
+                imagePath={post.imagePath}
+                alt={post.title}
+              />
+            ) : null}
           </article>
         ))}
       </div>

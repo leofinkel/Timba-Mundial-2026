@@ -10,9 +10,6 @@ import {
   PRIZE_DISTRIBUTION,
   SAVE_CONDITIONS,
 } from '@/constants/gameRulesFull';
-import { listPublicGameRules } from '@/services/gameRulesService';
-
-export const dynamic = 'force-dynamic';
 
 export const generateMetadata = async (): Promise<Metadata> => {
   return {
@@ -21,9 +18,7 @@ export const generateMetadata = async (): Promise<Metadata> => {
   };
 };
 
-const RulesPage = async () => {
-  const dbRules = await listPublicGameRules();
-
+const RulesPage = () => {
   return (
     <div className="dark min-h-screen bg-zinc-950 text-zinc-50">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_95%_65%_at_50%_-10%,rgba(16,185,129,0.24),transparent)]" />
@@ -34,38 +29,14 @@ const RulesPage = async () => {
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Reglas del Juego
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base">
-              Reglamento completo según el brief: sistema de puntajes, condiciones de guardado y
-              distribución de premios.
-            </p>
+            <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base">Reglamento completo</p>
           </div>
           <Button variant="outline" className="border-zinc-700 bg-zinc-900/50 text-zinc-100" asChild>
             <Link href="/">Volver al inicio</Link>
           </Button>
         </div>
 
-        {dbRules.length > 0 ? (
-          <section className="grid gap-4 sm:grid-cols-2">
-            {dbRules.map((rule) => (
-              <Card key={rule.id} className="border-zinc-800 bg-zinc-900/70">
-                <CardHeader>
-                  <CardTitle className="text-base text-white">{rule.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm text-zinc-300">
-                    {rule.content.split('\n').filter(Boolean).map((line) => (
-                      <li key={`${rule.id}-${line}`} className="rounded-md border border-zinc-800 bg-zinc-950/40 px-3 py-2">
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </section>
-        ) : null}
-
-        <section className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="grid gap-4 sm:grid-cols-2">
           <Card className="border-zinc-800 bg-zinc-900/70">
             <CardHeader>
               <CardTitle className="text-base text-white">Fase de Grupos</CardTitle>

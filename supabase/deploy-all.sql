@@ -40,6 +40,10 @@ DROP POLICY IF EXISTS "avatars_select_public" ON storage.objects;
 DROP POLICY IF EXISTS "avatars_insert_own" ON storage.objects;
 DROP POLICY IF EXISTS "avatars_update_own" ON storage.objects;
 DROP POLICY IF EXISTS "avatars_delete_own" ON storage.objects;
+DROP POLICY IF EXISTS "news_select_public" ON storage.objects;
+DROP POLICY IF EXISTS "news_insert_admin" ON storage.objects;
+DROP POLICY IF EXISTS "news_update_admin" ON storage.objects;
+DROP POLICY IF EXISTS "news_delete_admin" ON storage.objects;
 
 -- #####################################################################
 -- STEP 2: SCHEMA (tables, indexes, triggers, RLS)
@@ -211,7 +215,9 @@ CREATE TABLE public.news_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   body TEXT NOT NULL,
+  image_path TEXT,
   author_id UUID NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  is_visible BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -237,6 +243,8 @@ CREATE INDEX idx_prediction_best_third_prediction_id
 CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_points DESC NULLS LAST);
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
+CREATE INDEX idx_news_posts_visible_created_at ON public.news_posts (is_visible, created_at DESC)
+  WHERE is_visible = true;
 CREATE INDEX idx_real_group_standings_group_id ON public.real_group_standings (group_id);
 
 -- updated_at trigger
@@ -372,6 +380,35 @@ CREATE POLICY "avatars_delete_own"
     bucket_id = 'avatars'
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('news', 'news', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "news_select_public"
+  ON storage.objects
+  FOR SELECT
+  TO public
+  USING (bucket_id = 'news');
+
+CREATE POLICY "news_insert_admin"
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'news' AND public.is_admin());
+
+CREATE POLICY "news_update_admin"
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'news' AND public.is_admin())
+  WITH CHECK (bucket_id = 'news' AND public.is_admin());
+
+CREATE POLICY "news_delete_admin"
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'news' AND public.is_admin());
 
 -- #####################################################################
 -- STEP 3: SEED DATA (teams, matches, game rules)

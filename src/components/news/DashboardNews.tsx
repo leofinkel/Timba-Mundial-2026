@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Newspaper } from 'lucide-react';
 
+import { NewsPostImage } from '@/components/news/NewsPostImage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { NewsPost } from '@/types/news';
 
@@ -26,12 +27,18 @@ export const DashboardNews = ({ news }: DashboardNewsProps) => {
           >
             <h3 className="text-sm font-semibold text-white">{post.title}</h3>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {post.authorName} ·{' '}
               {format(new Date(post.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
             </p>
             <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-zinc-300">
               {post.body}
             </p>
+            {post.imagePath ? (
+              <NewsPostImage
+                className="mt-3 rounded-md"
+                imagePath={post.imagePath}
+                alt={post.title}
+              />
+            ) : null}
           </article>
         ))}
       </CardContent>

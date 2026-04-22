@@ -274,12 +274,18 @@ CREATE TABLE public.news_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   body TEXT NOT NULL,
+  image_path TEXT,
   author_id UUID NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  is_visible BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.news_posts IS 'Admin-authored news items displayed on home and dashboard pages.';
+COMMENT ON COLUMN public.news_posts.is_visible IS
+  'When false, the post is not listed on the public home or user dashboard.';
+COMMENT ON COLUMN public.news_posts.image_path IS
+  'Object path in storage bucket news, e.g. {post_id}/image.jpg.';
 
 -- =============================================================================
 -- SECTION: Indexes (frequent filters, joins, leaderboard)
@@ -315,6 +321,8 @@ CREATE INDEX idx_user_scores_total_points_desc ON public.user_scores (total_poin
 CREATE INDEX idx_user_scores_rank ON public.user_scores (rank);
 
 CREATE INDEX idx_news_posts_created_at_desc ON public.news_posts (created_at DESC);
+CREATE INDEX idx_news_posts_visible_created_at ON public.news_posts (is_visible, created_at DESC)
+  WHERE is_visible = true;
 
 CREATE INDEX idx_real_group_standings_group_id ON public.real_group_standings (group_id);
 

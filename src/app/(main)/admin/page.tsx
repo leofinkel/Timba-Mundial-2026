@@ -13,7 +13,7 @@ import {
 import { createServerClient } from '@/lib/supabase/server';
 import { getLatestRealResults } from '@/repositories/realResultsRepository';
 import { getTournament } from '@/services/fixtureService';
-import { listPublicNews } from '@/services/newsService';
+import { listAllNewsForAdmin } from '@/services/newsService';
 import { listRealGroupStandingsGrouped } from '@/services/realGroupStandingsService';
 
 const AdminPage = async () => {
@@ -44,7 +44,7 @@ const AdminPage = async () => {
     listClassificationForAdmin(),
     listSubmittedPredictionsForAdmin(),
     getTournament(),
-    listPublicNews(),
+    listAllNewsForAdmin(),
     listRealGroupStandingsGrouped(),
     (async () => {
       const supabase = await createServerClient();
