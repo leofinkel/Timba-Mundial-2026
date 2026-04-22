@@ -3,8 +3,18 @@
 import { useMemo } from 'react';
 
 import { KNOCKOUT_ROUNDS } from '@/constants/tournament';
-import type { UserPredictionView } from '@/types/prediction';
+import type { KnockoutMatchPrediction, UserPredictionView } from '@/types/prediction';
 import type { GroupName, KnockoutRound, Tournament } from '@/types/tournament';
+
+/** Si solo hay ganador elegido (goles 0-0 en DB), mostramos 1-0 o 0-1 según `winnerId`. */
+const formatKnockoutScoreLine = (pr: KnockoutMatchPrediction): string => {
+  const { homeGoals, awayGoals, winnerId, homeTeamId, awayTeamId } = pr;
+  if (homeGoals === 0 && awayGoals === 0 && winnerId) {
+    if (homeTeamId && winnerId === homeTeamId) return '1 - 0';
+    if (awayTeamId && winnerId === awayTeamId) return '0 - 1';
+  }
+  return `${homeGoals} - ${awayGoals}`;
+};
 
 interface OtherUserPredictionsViewProps {
   displayName: string;
@@ -148,7 +158,7 @@ export const OtherUserPredictionsView = ({
                           {homeLabel} — {awayLabel}
                         </span>
                         <span className="shrink-0 tabular-nums font-medium text-zinc-100">
-                          {pr ? `${pr.homeGoals} - ${pr.awayGoals}` : '—'}
+                          {pr ? formatKnockoutScoreLine(pr) : '—'}
                         </span>
                       </li>
                     );
