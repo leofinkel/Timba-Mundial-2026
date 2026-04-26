@@ -525,3 +525,18 @@ export const useAdminFixtureResults = ({
 
 export const buildAllTeamsList = (tournament: Tournament): Team[] =>
   tournament.groups.flatMap((g) => g.teams);
+
+/** Equipos del torneo (fase de grupos), sin duplicar; orden alfabético para selects admin. */
+export const buildTournamentTeamSelectOptions = (
+  tournament: Tournament,
+): { id: string; name: string }[] => {
+  const byId = new Map<string, string>();
+  for (const g of tournament.groups) {
+    for (const t of g.teams) {
+      if (!byId.has(t.id)) byId.set(t.id, t.name);
+    }
+  }
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+};

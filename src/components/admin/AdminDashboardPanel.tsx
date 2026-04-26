@@ -146,7 +146,6 @@ export const AdminDashboardPanel = ({
       </TabsContent>
       <TabsContent value="results" className="mt-6">
         <AdminResultsTab
-          teams={teams}
           tournament={tournament}
           initialOfficialResults={initialOfficialResults}
         />

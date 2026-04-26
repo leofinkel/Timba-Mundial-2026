@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -21,13 +21,15 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { buildAllTeamsList, useAdminFixtureResults } from '@/hooks/useAdminFixtureResults';
+import {
+  buildAllTeamsList,
+  buildTournamentTeamSelectOptions,
+  useAdminFixtureResults,
+} from '@/hooks/useAdminFixtureResults';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { Tournament } from '@/types/tournament';
 
 const UNSET = '__unset__';
-
-type TeamOption = { id: string; name: string };
 
 type OfficialFormState = {
   championTeamId: string;
@@ -49,13 +51,11 @@ const rowToFormState = (row: RealResultsRow | null): OfficialFormState => ({
 
 type AdminFixtureResultTabsProps = {
   tournament: Tournament;
-  teams: TeamOption[];
   initialOfficialResults: RealResultsRow | null;
 };
 
 export const AdminFixtureResultTabs = ({
   tournament,
-  teams,
   initialOfficialResults,
 }: AdminFixtureResultTabsProps) => {
   const router = useRouter();
@@ -79,6 +79,10 @@ export const AdminFixtureResultTabs = ({
   } = useAdminFixtureResults({ tournament });
 
   const allTeams = buildAllTeamsList(tournament);
+  const honorBoardTeams = useMemo(
+    () => buildTournamentTeamSelectOptions(tournament),
+    [tournament],
+  );
   const [pendingMatches, startMatchSave] = useTransition();
   const [pendingSpecial, startSpecialSave] = useTransition();
 
@@ -226,7 +230,7 @@ export const AdminFixtureResultTabs = ({
                         <SelectItem value={UNSET} disabled>
                           Seleccionar…
                         </SelectItem>
-                        {teams.map((t) => (
+                        {honorBoardTeams.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
                             {t.name}
                           </SelectItem>
@@ -249,7 +253,7 @@ export const AdminFixtureResultTabs = ({
                         <SelectItem value={UNSET} disabled>
                           Seleccionar…
                         </SelectItem>
-                        {teams.map((t) => (
+                        {honorBoardTeams.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
                             {t.name}
                           </SelectItem>
@@ -272,7 +276,7 @@ export const AdminFixtureResultTabs = ({
                         <SelectItem value={UNSET} disabled>
                           Seleccionar…
                         </SelectItem>
-                        {teams.map((t) => (
+                        {honorBoardTeams.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
                             {t.name}
                           </SelectItem>
@@ -295,7 +299,7 @@ export const AdminFixtureResultTabs = ({
                         <SelectItem value={UNSET} disabled>
                           Seleccionar…
                         </SelectItem>
-                        {teams.map((t) => (
+                        {honorBoardTeams.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
                             {t.name}
                           </SelectItem>

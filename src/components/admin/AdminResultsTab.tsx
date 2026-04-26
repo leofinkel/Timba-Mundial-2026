@@ -6,19 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { Tournament } from '@/types/tournament';
 
-interface TeamOption {
-  id: string;
-  name: string;
-}
-
 interface AdminResultsTabProps {
-  teams: TeamOption[];
   tournament: Tournament;
   initialOfficialResults: RealResultsRow | null;
 }
 
 export const AdminResultsTab = ({
-  teams,
   tournament,
   initialOfficialResults,
 }: AdminResultsTabProps) => {
@@ -37,7 +30,6 @@ export const AdminResultsTab = ({
           <AdminResetOfficialResultsButton />
           <AdminFixtureResultTabs
             tournament={tournament}
-            teams={teams}
             initialOfficialResults={initialOfficialResults}
           />
         </CardContent>
