@@ -24,6 +24,8 @@ type PredMatchRow = {
   home_goals: number;
   away_goals: number;
   winner_team_id: string | null;
+  pred_home_team_id: string | null;
+  pred_away_team_id: string | null;
 };
 
 type StandingRow = { group_id: string; team_id: string; position: number };
@@ -56,6 +58,13 @@ type MutableBreakdown = {
   bestPlayerPoints: number;
 };
 
+type KnockoutBreakdownKey =
+  | 'roundOf32Points'
+  | 'roundOf16Points'
+  | 'quarterFinalPoints'
+  | 'semiFinalPoints'
+  | 'finalistPoints';
+
 const emptyBreakdown = (): MutableBreakdown => ({
   groupMatchPoints: 0,
   exactResultBonus: 0,
@@ -76,7 +85,7 @@ const emptyBreakdown = (): MutableBreakdown => ({
 const outcomeSide = (hg: number, ag: number): 'home' | 'away' | 'draw' =>
   hg > ag ? 'home' : hg < ag ? 'away' : 'draw';
 
-const knockoutBucket = (stage: string): keyof MutableBreakdown | null => {
+const knockoutBucket = (stage: string): KnockoutBreakdownKey | null => {
   switch (stage) {
     case 'round-of-32':
       return 'roundOf32Points';
@@ -88,8 +97,6 @@ const knockoutBucket = (stage: string): keyof MutableBreakdown | null => {
       return 'semiFinalPoints';
     case 'final':
       return 'finalistPoints';
-    case 'third-place':
-      return 'semiFinalPoints';
     default:
       return null;
   }
@@ -107,11 +114,81 @@ const knockoutUnitPoints = (stage: string): number => {
       return SCORING_RULES.knockout.semiFinals;
     case 'final':
       return SCORING_RULES.knockout.finalists;
-    case 'third-place':
-      return SCORING_RULES.knockout.semiFinals;
     default:
       return 0;
   }
+};
+
+const stageTeamsFromPrediction = (
+  predMatches: PredMatchRow[],
+  matches: MatchRow[],
+  stage: string,
+): Set<string> => {
+  const matchIdSet = new Set(
+    matches.filter((m) => m.stage === stage).map((m) => m.id),
+  );
+  const teams = new Set<string>();
+  for (const pm of predMatches) {
+    if (!matchIdSet.has(pm.match_id)) continue;
+    if (pm.pred_home_team_id) teams.add(pm.pred_home_team_id);
+    if (pm.pred_away_team_id) teams.add(pm.pred_away_team_id);
+  }
+  return teams;
+};
+
+const stageTeamsFromOfficial = (matches: MatchRow[], stage: string): Set<string> => {
+  const teams = new Set<string>();
+  for (const m of matches) {
+    if (m.stage !== stage) continue;
+    if (m.home_team_id) teams.add(m.home_team_id);
+    if (m.away_team_id) teams.add(m.away_team_id);
+  }
+  return teams;
+};
+
+const scoreKnockoutQualifiedTeams = (
+  predMatches: PredMatchRow[],
+  matches: MatchRow[],
+): Pick<
+  MutableBreakdown,
+  | 'roundOf32Points'
+  | 'roundOf16Points'
+  | 'quarterFinalPoints'
+  | 'semiFinalPoints'
+  | 'finalistPoints'
+> => {
+  const stages = [
+    'round-of-32',
+    'round-of-16',
+    'quarter-finals',
+    'semi-finals',
+    'final',
+  ] as const;
+
+  const out = {
+    roundOf32Points: 0,
+    roundOf16Points: 0,
+    quarterFinalPoints: 0,
+    semiFinalPoints: 0,
+    finalistPoints: 0,
+  };
+
+  for (const stage of stages) {
+    const bucket = knockoutBucket(stage);
+    const unitPoints = knockoutUnitPoints(stage);
+    if (!bucket || unitPoints <= 0) continue;
+
+    const predicted = stageTeamsFromPrediction(predMatches, matches, stage);
+    const actual = stageTeamsFromOfficial(matches, stage);
+
+    let hits = 0;
+    for (const teamId of predicted) {
+      if (actual.has(teamId)) hits += 1;
+    }
+    out[bucket] = hits * unitPoints;
+  }
+
+  return out;
 };
 
 /** Final 1–4 per group from group_standings; only groups with exactly 4 rows count. */
@@ -191,19 +268,17 @@ const computeForPrediction = (params: {
       continue;
     }
 
-    const bucket = knockoutBucket(m.stage);
-    const pts = knockoutUnitPoints(m.stage);
-    if (
-      bucket &&
-      pts > 0 &&
-      pm.winner_team_id &&
-      m.winner_team_id &&
-      pm.winner_team_id === m.winner_team_id
-    ) {
-      const k = bucket;
-      b[k] += pts;
-    }
   }
+
+  const knockoutByQualifiedTeams = scoreKnockoutQualifiedTeams(
+    params.predMatches,
+    params.matches,
+  );
+  b.roundOf32Points = knockoutByQualifiedTeams.roundOf32Points;
+  b.roundOf16Points = knockoutByQualifiedTeams.roundOf16Points;
+  b.quarterFinalPoints = knockoutByQualifiedTeams.quarterFinalPoints;
+  b.semiFinalPoints = knockoutByQualifiedTeams.semiFinalPoints;
+  b.finalistPoints = knockoutByQualifiedTeams.finalistPoints;
 
   for (const [gid, actualPosByTeam] of params.finalGroupPositions) {
     const predicted = params.standings.filter((s) => s.group_id === gid);
@@ -418,7 +493,9 @@ export const calculateAllScores = async (): Promise<{
 
     const { data: allPm, error: pme } = await supabase
       .from('prediction_matches')
-      .select('prediction_id, match_id, home_goals, away_goals, winner_team_id')
+      .select(
+        'prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
+      )
       .in('prediction_id', predictionIds);
 
     if (pme) {
@@ -454,6 +531,8 @@ export const calculateAllScores = async (): Promise<{
         home_goals: row.home_goals,
         away_goals: row.away_goals,
         winner_team_id: row.winner_team_id,
+        pred_home_team_id: row.pred_home_team_id,
+        pred_away_team_id: row.pred_away_team_id,
       });
       pmByPred.set(row.prediction_id, list);
     }
@@ -562,7 +641,9 @@ export const calculateUserScore = async (
 
     const { data: pm, error: pme } = await supabase
       .from('prediction_matches')
-      .select('match_id, home_goals, away_goals, winner_team_id')
+      .select(
+        'match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
+      )
       .eq('prediction_id', pred.id);
 
     if (pme) {
