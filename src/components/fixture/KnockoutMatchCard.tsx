@@ -67,14 +67,30 @@ export const KnockoutMatchCard = ({
   onChange,
   disabled = false,
 }: KnockoutMatchCardProps) => {
-  const homeResolved =
-    match.homeTeam ??
-    allTeams.find((t) => t.id === prediction.homeTeamId) ??
-    null;
-  const awayResolved =
-    match.awayTeam ??
-    allTeams.find((t) => t.id === prediction.awayTeamId) ??
-    null;
+  const fromPredictionHome = prediction.homeTeamId
+    ? allTeams.find((t) => t.id === prediction.homeTeamId) ?? null
+    : null;
+  const fromPredictionAway = prediction.awayTeamId
+    ? allTeams.find((t) => t.id === prediction.awayTeamId) ?? null
+    : null;
+  /** Tu planilla: mostrar siempre el pronóstico; los equipos del partido en BD son el resultado real. */
+  const homeResolved = fromPredictionHome ?? match.homeTeam ?? null;
+  const awayResolved = fromPredictionAway ?? match.awayTeam ?? null;
+
+  const officialHome = match.homeTeam;
+  const officialAway = match.awayTeam;
+  const hasOfficialPair = !!(officialHome && officialAway);
+  const predictionPairComplete = !!(fromPredictionHome && fromPredictionAway);
+  const officialDiffersFromPrediction =
+    predictionPairComplete &&
+    hasOfficialPair &&
+    (officialHome!.id !== fromPredictionHome!.id ||
+      officialAway!.id !== fromPredictionAway!.id);
+  const hasOfficialScore =
+    match.homeGoals !== null &&
+    match.awayGoals !== null &&
+    Number.isFinite(match.homeGoals) &&
+    Number.isFinite(match.awayGoals);
 
   const bothResolved = !!homeResolved && !!awayResolved;
   const isHonorMatch = isHonorPlacementMatch(match);
@@ -153,6 +169,25 @@ export const KnockoutMatchCard = ({
 
           <TeamSlot team={awayResolved} label="Por definir…" />
         </div>
+
+        {(hasOfficialScore || officialDiffersFromPrediction) && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
+            <span className="text-xs text-muted-foreground">Real:</span>
+            {hasOfficialPair && officialDiffersFromPrediction ? (
+              <span className="max-w-full truncate text-xs text-muted-foreground">
+                {officialHome!.name} vs {officialAway!.name}
+              </span>
+            ) : null}
+            {hasOfficialScore ? (
+              <Badge variant="outline" className="h-5 font-mono text-[11px] tabular-nums">
+                {match.homeGoals} – {match.awayGoals}
+              </Badge>
+            ) : null}
+            {officialDiffersFromPrediction ? (
+              <span className="text-[11px] text-amber-400/80">Difiere</span>
+            ) : null}
+          </div>
+        )}
 
         {bothResolved && isHonorMatch ? (
           <div className="space-y-3">

@@ -94,32 +94,6 @@ export type UseFixturePredictionsArgs = {
 
 export type GroupPredictionState = GroupMatchScoresInput;
 
-/** Strip user-predicted teams; keep only slots fixed by the tournament (official results in DB). */
-const clearKnockoutToOfficialOnly = (
-  matches: KnockoutMatch[],
-  prev: Record<string, KnockoutMatchPrediction>,
-): Record<string, KnockoutMatchPrediction> => {
-  let changed = false;
-  const next = { ...prev };
-  for (const m of matches) {
-    const cur = next[m.id];
-    if (!cur) continue;
-    const home = m.homeTeam?.id ?? '';
-    const away = m.awayTeam?.id ?? '';
-    let winnerId = cur.winnerId;
-    if (!home || !away) {
-      winnerId = '';
-    } else if (winnerId && winnerId !== home && winnerId !== away) {
-      winnerId = '';
-    }
-    if (cur.homeTeamId !== home || cur.awayTeamId !== away || cur.winnerId !== winnerId) {
-      changed = true;
-      next[m.id] = { ...cur, homeTeamId: home, awayTeamId: away, winnerId };
-    }
-  }
-  return changed ? next : prev;
-};
-
 const buildGroupPredictionState = (
   groups: Tournament['groups'],
   initial?: GroupMatchPrediction[] | undefined,
@@ -324,9 +298,6 @@ export const useFixturePredictions = ({
 
   useEffect(() => {
     if (!isGroupStageComplete) {
-      setKnockoutPredictions((prev) =>
-        clearKnockoutToOfficialOnly(tournament.knockoutMatches, prev),
-      );
       return;
     }
 
