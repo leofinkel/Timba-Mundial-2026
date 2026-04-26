@@ -180,20 +180,6 @@ const naturalWinnerFromScore = (
   return null;
 };
 
-const initManualFromOverrides = (
-  groups: Tournament['groups'],
-  overrides: Partial<Record<GroupName, string[]>> | undefined,
-): Partial<Record<GroupName, string[]>> => {
-  const out: Partial<Record<GroupName, string[]>> = {};
-  for (const g of groups) {
-    const o = overrides?.[g.id];
-    if (o && o.length === 4) {
-      out[g.id] = [...o];
-    }
-  }
-  return out;
-};
-
 const isValidTeamOrder = (order: string[] | undefined, groupTeamIds: string[]): boolean => {
   if (!order || order.length !== groupTeamIds.length) return false;
   const set = new Set(order);
@@ -203,12 +189,10 @@ const isValidTeamOrder = (order: string[] | undefined, groupTeamIds: string[]): 
 
 export type UseAdminFixtureResultsArgs = {
   tournament: Tournament;
-  groupStandingOverrides?: Partial<Record<GroupName, string[]>>;
 };
 
 export const useAdminFixtureResults = ({
   tournament,
-  groupStandingOverrides,
 }: UseAdminFixtureResultsArgs) => {
   const [groupPredictions, setGroupPredictions] = useState<GroupMatchScoresInput>(() =>
     buildGroupStateFromTournament(tournament.groups),
@@ -219,13 +203,13 @@ export const useAdminFixtureResults = ({
 
   const [manualGroupOrder, setManualGroupOrder] = useState<
     Partial<Record<GroupName, string[]>>
-  >(() => initManualFromOverrides(tournament.groups, groupStandingOverrides));
+  >({});
 
   useEffect(() => {
     setGroupPredictions(buildGroupStateFromTournament(tournament.groups));
     setKnockoutPredictions(buildKnockoutStateFromTournament(tournament.knockoutMatches));
-    setManualGroupOrder(initManualFromOverrides(tournament.groups, groupStandingOverrides));
-  }, [tournament, groupStandingOverrides]);
+    setManualGroupOrder({});
+  }, [tournament]);
 
   const rawGroupStandings = useMemo(() => {
     const out = {} as Record<

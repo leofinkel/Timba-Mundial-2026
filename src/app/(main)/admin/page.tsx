@@ -14,7 +14,6 @@ import { createServerClient } from '@/lib/supabase/server';
 import { getLatestRealResults } from '@/repositories/realResultsRepository';
 import { getTournament } from '@/services/fixtureService';
 import { listAllNewsForAdmin } from '@/services/newsService';
-import { listRealGroupStandingsGrouped } from '@/services/realGroupStandingsService';
 
 const AdminPage = async () => {
   const userResult = await getCurrentUser();
@@ -34,7 +33,6 @@ const AdminPage = async () => {
     submittedPredictionUsers,
     tournament,
     news,
-    groupStandingOverrides,
     initialOfficialResults,
   ] = await Promise.all([
     getAllUsersAction(),
@@ -45,7 +43,6 @@ const AdminPage = async () => {
     listSubmittedPredictionsForAdmin(),
     getTournament(),
     listAllNewsForAdmin(),
-    listRealGroupStandingsGrouped(),
     (async () => {
       const supabase = await createServerClient();
       return getLatestRealResults(supabase);
@@ -83,7 +80,6 @@ const AdminPage = async () => {
         submittedPredictionUsers={submittedPredictionUsers}
         tournament={tournament}
         news={news}
-        groupStandingOverrides={groupStandingOverrides}
         initialOfficialResults={initialOfficialResults}
       />
     </div>

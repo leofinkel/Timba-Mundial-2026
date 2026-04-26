@@ -23,7 +23,7 @@ import type { AdminClassificationEntry, AdminGameRule, AdminSubmittedPredictionU
 import type { UserProfile } from '@/types/auth';
 import type { NewsPost } from '@/types/news';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
-import type { GroupName, Tournament } from '@/types/tournament';
+import type { Tournament } from '@/types/tournament';
 import { ChevronDown } from 'lucide-react';
 
 interface TeamOption {
@@ -50,7 +50,6 @@ interface AdminDashboardPanelProps {
   submittedPredictionUsers: AdminSubmittedPredictionUser[];
   tournament: Tournament;
   news: NewsPost[];
-  groupStandingOverrides: Partial<Record<GroupName, string[]>>;
   initialOfficialResults: RealResultsRow | null;
 }
 
@@ -65,7 +64,6 @@ export const AdminDashboardPanel = ({
   submittedPredictionUsers,
   tournament,
   news,
-  groupStandingOverrides,
   initialOfficialResults,
 }: AdminDashboardPanelProps) => {
   const [activeTab, setActiveTab] = useState('payments');
@@ -150,7 +148,6 @@ export const AdminDashboardPanel = ({
         <AdminResultsTab
           teams={teams}
           tournament={tournament}
-          groupStandingOverrides={groupStandingOverrides}
           initialOfficialResults={initialOfficialResults}
         />
       </TabsContent>

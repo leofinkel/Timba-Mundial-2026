@@ -86,30 +86,6 @@ export const clearMatchResultSchema = z.object({
   matchId: z.string().min(1),
 });
 
-const adminGroupLetterSchema = z.enum([
-  'A',
-  'B',
-  'C',
-  'D',
-  'E',
-  'F',
-  'G',
-  'H',
-  'I',
-  'J',
-  'K',
-  'L',
-]);
-
-export const adminGroupStandingsOverrideSchema = z.object({
-  groupId: adminGroupLetterSchema,
-  teamIds: z.array(z.string().min(1)).length(4),
-});
-
-export const adminGroupStandingsClearSchema = z.object({
-  groupId: adminGroupLetterSchema,
-});
-
 export const paymentStatusUpdateSchema = z.enum(['pending', 'paid']);
 
 export const adminGameRuleSchema = z.object({
@@ -158,10 +134,6 @@ export type KnockoutMatchPredictionSchemaInferred = z.infer<
 export type SaveSpecialPredictionsSchemaInferred = z.infer<typeof saveSpecialPredictionsSchema>;
 export type SaveSpecialResultsSchemaInferred = z.infer<typeof saveSpecialResultsSchema>;
 export type AdminResultSchemaInferred = z.infer<typeof adminResultSchema>;
-export type AdminGroupStandingsOverrideSchemaInferred = z.infer<
-  typeof adminGroupStandingsOverrideSchema
->;
-export type AdminGroupStandingsClearSchemaInferred = z.infer<typeof adminGroupStandingsClearSchema>;
 export type KnockoutResultSchemaInferred = z.infer<typeof knockoutResultSchema>;
 export type AdminGameRuleSchemaInferred = z.infer<typeof adminGameRuleSchema>;
 export type AdminMatchSchemaInferred = z.infer<typeof adminMatchSchema>;

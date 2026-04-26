@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdminFixtureResultTabs } from '@/components/admin/AdminFixtureResultTabs';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
-import type { GroupName, Tournament } from '@/types/tournament';
+import type { Tournament } from '@/types/tournament';
 
 interface TeamOption {
   id: string;
@@ -13,14 +13,12 @@ interface TeamOption {
 interface AdminResultsTabProps {
   teams: TeamOption[];
   tournament: Tournament;
-  groupStandingOverrides: Partial<Record<GroupName, string[]>>;
   initialOfficialResults: RealResultsRow | null;
 }
 
 export const AdminResultsTab = ({
   teams,
   tournament,
-  groupStandingOverrides,
   initialOfficialResults,
 }: AdminResultsTabProps) => {
   return (
@@ -37,7 +35,6 @@ export const AdminResultsTab = ({
         <CardContent>
           <AdminFixtureResultTabs
             tournament={tournament}
-            groupStandingOverrides={groupStandingOverrides}
             teams={teams}
             initialOfficialResults={initialOfficialResults}
           />

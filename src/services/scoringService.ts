@@ -4,7 +4,6 @@ import { SCORING_RULES } from '@/constants/scoring';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
-import { listAllRealGroupStandings } from '@/repositories/realGroupStandingsRepository';
 import type { UserScoreBreakdown } from '@/types/scoring';
 
 const log = createServiceLogger('scoringService');
@@ -115,8 +114,8 @@ const knockoutUnitPoints = (stage: string): number => {
   }
 };
 
-/** Admin-saved 1–4 per group: only groups with exactly 4 rows count for scoring. */
-const buildAdminFinalGroupPositions = (
+/** Final 1–4 per group from group_standings; only groups with exactly 4 rows count. */
+const buildFinalGroupPositions = (
   rows: { group_id: string; team_id: string; position: number }[],
 ): Map<string, Map<string, number>> => {
   const byGroup = new Map<string, { team_id: string; position: number }[]>();
@@ -146,12 +145,12 @@ const groupHasAllGroupMatchesPlayed = (matches: MatchRow[], groupId: string): bo
   );
 };
 
-const filterAdminGroupPositionsByCompleteGroups = (
-  admin: Map<string, Map<string, number>>,
+const filterGroupPositionsByCompleteGroups = (
+  groupPositions: Map<string, Map<string, number>>,
   matches: MatchRow[],
 ): Map<string, Map<string, number>> => {
   const out = new Map<string, Map<string, number>>();
-  for (const [gid, posMap] of admin) {
+  for (const [gid, posMap] of groupPositions) {
     if (groupHasAllGroupMatchesPlayed(matches, gid)) {
       out.set(gid, posMap);
     }
@@ -166,7 +165,7 @@ const computeForPrediction = (params: {
   specials: SpecialRow | null;
   matches: MatchRow[];
   real: RealResultsRow | null;
-  adminFinalGroupPositions: Map<string, Map<string, number>>;
+  finalGroupPositions: Map<string, Map<string, number>>;
 }): MutableBreakdown => {
   const b = emptyBreakdown();
   const matchById = new Map(params.matches.map((m) => [m.id, m]));
@@ -206,7 +205,7 @@ const computeForPrediction = (params: {
     }
   }
 
-  for (const [gid, actualPosByTeam] of params.adminFinalGroupPositions) {
+  for (const [gid, actualPosByTeam] of params.finalGroupPositions) {
     const predicted = params.standings.filter((s) => s.group_id === gid);
     for (const s of predicted) {
       const aPos = actualPosByTeam.get(s.team_id);
@@ -478,10 +477,18 @@ export const calculateAllScores = async (): Promise<{
       });
     }
 
-    const adminRows = await listAllRealGroupStandings(supabase);
     const matchRows = (matches ?? []) as MatchRow[];
-    const adminFinalGroupPositions = filterAdminGroupPositionsByCompleteGroups(
-      buildAdminFinalGroupPositions(adminRows),
+    const { data: groupStandingsRows, error: gserr } = await supabase
+      .from('group_standings')
+      .select('group_id, team_id, position');
+
+    if (gserr) {
+      log.error({ err: gserr }, 'calculateAllScores group_standings failed');
+      throw new Error(gserr.message);
+    }
+
+    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
+      buildFinalGroupPositions(groupStandingsRows ?? []),
       matchRows,
     );
 
@@ -494,7 +501,7 @@ export const calculateAllScores = async (): Promise<{
         specials: spByPred.get(p.id) ?? null,
         matches: matchRows,
         real: (real as RealResultsRow | null) ?? null,
-        adminFinalGroupPositions,
+        finalGroupPositions,
       });
 
       await persistUserScore(supabase, p.user_id, b);
@@ -581,10 +588,17 @@ export const calculateUserScore = async (
       throw new Error(spe.message);
     }
 
-    const adminRows = await listAllRealGroupStandings(supabase);
     const matchRows = (matches ?? []) as MatchRow[];
-    const adminFinalGroupPositions = filterAdminGroupPositionsByCompleteGroups(
-      buildAdminFinalGroupPositions(adminRows),
+    const { data: groupStandingsRows, error: gserr } = await supabase
+      .from('group_standings')
+      .select('group_id, team_id, position');
+
+    if (gserr) {
+      throw new Error(gserr.message);
+    }
+
+    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
+      buildFinalGroupPositions(groupStandingsRows ?? []),
       matchRows,
     );
 
@@ -595,7 +609,7 @@ export const calculateUserScore = async (
       specials: sp,
       matches: matchRows,
       real: (real as RealResultsRow | null) ?? null,
-      adminFinalGroupPositions,
+      finalGroupPositions,
     });
 
     await persistUserScore(supabase, userId, b);

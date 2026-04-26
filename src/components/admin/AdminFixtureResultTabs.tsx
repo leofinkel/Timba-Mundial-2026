@@ -6,7 +6,6 @@ import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { saveSpecialResultsAction } from '@/actions/results';
-import { AdminGroupStandingsOverrideCard } from '@/components/admin/AdminGroupStandingsOverrideCard';
 import { GroupStage } from '@/components/fixture/GroupStage';
 import { KnockoutBracket } from '@/components/fixture/KnockoutBracket';
 import { SpecialPredictions } from '@/components/fixture/SpecialPredictions';
@@ -24,7 +23,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buildAllTeamsList, useAdminFixtureResults } from '@/hooks/useAdminFixtureResults';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
-import type { GroupName, Tournament } from '@/types/tournament';
+import type { Tournament } from '@/types/tournament';
 
 const UNSET = '__unset__';
 
@@ -50,14 +49,12 @@ const rowToFormState = (row: RealResultsRow | null): OfficialFormState => ({
 
 type AdminFixtureResultTabsProps = {
   tournament: Tournament;
-  groupStandingOverrides: Partial<Record<GroupName, string[]>>;
   teams: TeamOption[];
   initialOfficialResults: RealResultsRow | null;
 };
 
 export const AdminFixtureResultTabs = ({
   tournament,
-  groupStandingOverrides,
   teams,
   initialOfficialResults,
 }: AdminFixtureResultTabsProps) => {
@@ -79,7 +76,7 @@ export const AdminFixtureResultTabs = ({
     updateGroupMatch,
     updateKnockoutMatch,
     applyMatchResults,
-  } = useAdminFixtureResults({ tournament, groupStandingOverrides });
+  } = useAdminFixtureResults({ tournament });
 
   const allTeams = buildAllTeamsList(tournament);
   const [pendingMatches, startMatchSave] = useTransition();
@@ -187,12 +184,6 @@ export const AdminFixtureResultTabs = ({
             onGroupMatchUpdate={updateGroupMatch}
             disabled={pendingMatches}
           />
-          <div className="mt-6">
-            <AdminGroupStandingsOverrideCard
-              tournament={tournament}
-              initialOverrides={groupStandingOverrides}
-            />
-          </div>
         </TabsContent>
 
         <TabsContent value="knockout" className="mt-4">
@@ -331,8 +322,7 @@ export const AdminFixtureResultTabs = ({
         <p className="text-sm text-zinc-400">
           Guardá el marcador de los partidos que cambiaste; se comparan con las
           planillas y se recalculan los puntos. En grupos, los puntos por posición
-          solo cuentan cuando el grupo termina (todos los partidos con resultado)
-          y el 1.º–4.º oficiales quedan guardados abajo o con override.
+          solo cuentan cuando el grupo termina (todos los partidos con resultado).
         </p>
         <Button
           type="button"
