@@ -2,6 +2,17 @@ import { SCORING_RULES } from '@/constants/scoring';
 import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import type { MatchRow } from '@/repositories/matchRepository';
+
+/** Mínimo para 103/104: compatible con el `MatchRow` “delgado” de scoringService. */
+export type MatchForHonorResolve = {
+  match_number: number;
+  stage: string;
+  home_team_id: string | null;
+  away_team_id: string | null;
+  home_goals: number | null;
+  away_goals: number | null;
+  winner_team_id: string | null;
+};
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { GroupName } from '@/types/tournament';
 
@@ -43,27 +54,107 @@ export const actualWinnerFromMatch = (m: ScoringMatchLike): string | null => {
 };
 
 /**
- * Predicción: ganador explícito solo si es uno de los dos equipos del partido; si no,
- * se infiere por goles (evita winner_team_id obsoleto vs cuadro actual).
+ * Ganador de la predicción: primero por goles (lo que el usuario puso en el partido);
+ * si empate, acepta `winner_team_id` solo si es local o visita del partido oficial
+ * (p. ej. penales en el pronóstico).
  */
 export const predictedWinner = (p: PredMatch, m: ScoringMatchLike): string | null => {
-  if (
-    p.winner_team_id &&
-    m.home_team_id &&
-    m.away_team_id &&
-    (p.winner_team_id === m.home_team_id || p.winner_team_id === m.away_team_id)
-  ) {
-    return p.winner_team_id;
+  if (!m.home_team_id || !m.away_team_id) return null;
+  const h = p.home_goals;
+  const a = p.away_goals;
+  if (h > a) return m.home_team_id;
+  if (a > h) return m.away_team_id;
+  if (h === a) {
+    if (
+      p.winner_team_id &&
+      (p.winner_team_id === m.home_team_id || p.winner_team_id === m.away_team_id)
+    ) {
+      return p.winner_team_id;
+    }
+    return null;
   }
-  // No mezclar m.winner_team_id (oficial) con goles de la predicción: si no, con el
-  // partido ya jugado todos "predicen" al campeón real (cuadro de honor a todos).
-  return actualWinnerFromMatch({
-    home_team_id: m.home_team_id,
-    away_team_id: m.away_team_id,
-    home_goals: p.home_goals,
-    away_goals: p.away_goals,
-    winner_team_id: p.winner_team_id,
-  });
+  return null;
+};
+
+export type OfficialHonorFromBracket = {
+  champion_team_id: string | null;
+  runner_up_team_id: string | null;
+  third_place_team_id: string | null;
+  fourth_place_team_id: string | null;
+};
+
+export const loserInMatch = (
+  homeTeamId: string | null,
+  awayTeamId: string | null,
+  winnerTeamId: string | null,
+): string | null => {
+  if (!homeTeamId || !awayTeamId || !winnerTeamId) return null;
+  if (winnerTeamId === homeTeamId) return awayTeamId;
+  if (winnerTeamId === awayTeamId) return homeTeamId;
+  return null;
+};
+
+/** Oficial: partidos 103/104 (goles) o, si aún no hay resultado, columnas de `real_results`. */
+export const resolveOfficialHonor = (
+  matches: MatchForHonorResolve[],
+  real: {
+    champion_team_id?: string | null;
+    runner_up_team_id?: string | null;
+    third_place_team_id?: string | null;
+    fourth_place_team_id?: string | null;
+  } | null,
+): OfficialHonorFromBracket => {
+  const m104 = matches.find((x) => x.match_number === 104) ?? matches.find((x) => x.stage === 'final');
+  const m103 = matches.find((x) => x.match_number === 103) ?? matches.find((x) => x.stage === 'third-place');
+
+  let champion_team_id: string | null = null;
+  let runner_up_team_id: string | null = null;
+  if (m104?.home_team_id && m104.away_team_id) {
+    if (m104.home_goals != null && m104.away_goals != null) {
+      const w = actualWinnerFromMatch(m104);
+      if (w) {
+        champion_team_id = w;
+        runner_up_team_id = loserInMatch(m104.home_team_id, m104.away_team_id, w);
+      } else {
+        champion_team_id = real?.champion_team_id ?? null;
+        runner_up_team_id = real?.runner_up_team_id ?? null;
+      }
+    } else {
+      champion_team_id = real?.champion_team_id ?? null;
+      runner_up_team_id = real?.runner_up_team_id ?? null;
+    }
+  } else {
+    champion_team_id = real?.champion_team_id ?? null;
+    runner_up_team_id = real?.runner_up_team_id ?? null;
+  }
+
+  let third_place_team_id: string | null = null;
+  let fourth_place_team_id: string | null = null;
+  if (m103?.home_team_id && m103.away_team_id) {
+    if (m103.home_goals != null && m103.away_goals != null) {
+      const w = actualWinnerFromMatch(m103);
+      if (w) {
+        third_place_team_id = w;
+        fourth_place_team_id = loserInMatch(m103.home_team_id, m103.away_team_id, w);
+      } else {
+        third_place_team_id = real?.third_place_team_id ?? null;
+        fourth_place_team_id = real?.fourth_place_team_id ?? null;
+      }
+    } else {
+      third_place_team_id = real?.third_place_team_id ?? null;
+      fourth_place_team_id = real?.fourth_place_team_id ?? null;
+    }
+  } else {
+    third_place_team_id = real?.third_place_team_id ?? null;
+    fourth_place_team_id = real?.fourth_place_team_id ?? null;
+  }
+
+  return {
+    champion_team_id,
+    runner_up_team_id,
+    third_place_team_id,
+    fourth_place_team_id,
+  };
 };
 
 export const scoreGroupMatches = (
@@ -297,10 +388,11 @@ export const scoreHonorFromBracket = (
   fourth: number;
 } => {
   const empty = { champion: 0, runnerUp: 0, third: 0, fourth: 0 };
-  if (!real) return empty;
+  const matches = [...officialById.values()];
+  const honor = resolveOfficialHonor(matches, real);
 
-  const finalM = [...officialById.values()].find((m) => m.stage === 'final');
-  const thirdM = [...officialById.values()].find((m) => m.stage === 'third-place');
+  const finalM = matches.find((m) => m.match_number === 104) ?? matches.find((m) => m.stage === 'final');
+  const thirdM = matches.find((m) => m.match_number === 103) ?? matches.find((m) => m.stage === 'third-place');
   if (!finalM?.id) return empty;
 
   const predFinal = preds.find((p) => p.match_id === finalM.id);
@@ -309,13 +401,14 @@ export const scoreHonorFromBracket = (
   const predChamp = predFinal ? predictedWinner(predFinal, finalM) : null;
 
   let champion = 0;
-  if (real.champion_team_id && predChamp && real.champion_team_id === predChamp) {
+  if (honor.champion_team_id && predChamp && honor.champion_team_id === predChamp) {
     champion = SCORING_RULES.honorBoard.champion;
   }
 
   let runnerUp = 0;
   if (
-    real.runner_up_team_id &&
+    honor.champion_team_id &&
+    honor.runner_up_team_id &&
     finalM.home_team_id &&
     finalM.away_team_id &&
     predFinal
@@ -324,33 +417,26 @@ export const scoreHonorFromBracket = (
     if (pw) {
       const other =
         pw === finalM.home_team_id ? finalM.away_team_id : finalM.home_team_id;
-      if (other === real.runner_up_team_id) {
+      if (other === honor.runner_up_team_id && pw !== honor.champion_team_id) {
         runnerUp = SCORING_RULES.honorBoard.runnerUp;
       }
     }
   }
 
   let third = 0;
-  if (
-    real.third_place_team_id &&
-    thirdM &&
-    thirdM.home_goals != null &&
-    predThird
-  ) {
-    const tw = actualWinnerFromMatch(thirdM);
+  if (honor.third_place_team_id && thirdM && predThird) {
     const pt = predictedWinner(predThird, thirdM);
-    if (tw && pt && tw === pt && tw === real.third_place_team_id) {
+    if (pt && pt === honor.third_place_team_id) {
       third = SCORING_RULES.honorBoard.thirdPlace;
     }
   }
 
   let fourth = 0;
-  if (real.fourth_place_team_id && thirdM && thirdM.home_goals != null && predThird) {
+  if (honor.fourth_place_team_id && thirdM && thirdM.home_team_id && thirdM.away_team_id && predThird) {
     const pw = predictedWinner(predThird, thirdM);
-    if (pw && thirdM.home_team_id && thirdM.away_team_id) {
-      const predLoser =
-        pw === thirdM.home_team_id ? thirdM.away_team_id : thirdM.home_team_id;
-      if (predLoser === real.fourth_place_team_id) {
+    if (pw) {
+      const predLoser = loserInMatch(thirdM.home_team_id, thirdM.away_team_id, pw);
+      if (predLoser && predLoser === honor.fourth_place_team_id) {
         fourth = SCORING_RULES.honorBoard.fourthPlace;
       }
     }
