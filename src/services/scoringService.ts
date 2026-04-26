@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { SCORING_RULES } from '@/constants/scoring';
+import { actualWinnerFromMatch, predictedWinner } from '@/lib/scoring/computeUserScore';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
@@ -62,23 +63,27 @@ const deriveOfficialHonorFromMatches = (matches: MatchRow[]): OfficialHonor | nu
   const m104 = matches.find((m) => m.match_number === 104) ?? matches.find((m) => m.stage === 'final');
   const m103 = matches.find((m) => m.match_number === 103) ?? matches.find((m) => m.stage === 'third-place');
   if (!m104 || !m103) return null;
-  if (!m104.home_team_id || !m104.away_team_id || !m104.winner_team_id) return null;
-  if (!m103.home_team_id || !m103.away_team_id || !m103.winner_team_id) return null;
+  if (!m104.home_team_id || !m104.away_team_id || !m103.home_team_id || !m103.away_team_id) {
+    return null;
+  }
+  const w104 = actualWinnerFromMatch(m104);
+  const w103 = actualWinnerFromMatch(m103);
+  if (!w104 || !w103) return null;
   const ru = loserOfOfficialMatch(
     m104.home_team_id,
     m104.away_team_id,
-    m104.winner_team_id,
+    w104,
   );
   const fourth = loserOfOfficialMatch(
     m103.home_team_id,
     m103.away_team_id,
-    m103.winner_team_id,
+    w103,
   );
   if (!ru || !fourth) return null;
   return {
-    champion_team_id: m104.winner_team_id,
+    champion_team_id: w104,
     runner_up_team_id: ru,
-    third_place_team_id: m103.winner_team_id,
+    third_place_team_id: w103,
     fourth_place_team_id: fourth,
   };
 };
@@ -347,44 +352,42 @@ const computeForPrediction = (params: {
   const honor = deriveOfficialHonorFromMatches(params.matches);
   const rr = params.real;
 
-  if (honor && finalPred?.winner_team_id) {
-    if (finalPred.winner_team_id === honor.champion_team_id) {
+  if (honor && finalPred && final) {
+    const predChamp = predictedWinner(finalPred, final);
+    if (predChamp && predChamp === honor.champion_team_id) {
       b.championPoints += SCORING_RULES.honorBoard.champion;
     }
   }
 
-  if (
-    honor &&
-    final &&
-    final.home_team_id &&
-    final.away_team_id &&
-    finalPred?.winner_team_id
-  ) {
-    const other =
-      finalPred.winner_team_id === final.home_team_id
-        ? final.away_team_id
-        : finalPred.winner_team_id === final.away_team_id
-          ? final.home_team_id
-          : null;
-    if (other && other === honor.runner_up_team_id) {
-      b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
+  if (honor && final && final.home_team_id && final.away_team_id && finalPred) {
+    const predWin = predictedWinner(finalPred, final);
+    if (predWin) {
+      const other =
+        predWin === final.home_team_id ? final.away_team_id : final.home_team_id;
+      if (other === honor.runner_up_team_id) {
+        b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
+      }
     }
   }
 
-  if (honor && thirdPred?.winner_team_id) {
-    if (thirdPred.winner_team_id === honor.third_place_team_id) {
+  if (honor && thirdPred && third) {
+    const predThirdW = predictedWinner(thirdPred, third);
+    if (predThirdW && predThirdW === honor.third_place_team_id) {
       b.thirdPlacePoints += SCORING_RULES.honorBoard.thirdPlace;
     }
   }
 
-  if (honor && third && third.home_team_id && third.away_team_id && thirdPred?.winner_team_id) {
-    const predLoser = loserOfOfficialMatch(
-      third.home_team_id,
-      third.away_team_id,
-      thirdPred.winner_team_id,
-    );
-    if (predLoser && predLoser === honor.fourth_place_team_id) {
-      b.fourthPlacePoints += SCORING_RULES.honorBoard.fourthPlace;
+  if (honor && third && third.home_team_id && third.away_team_id && thirdPred) {
+    const predWin = predictedWinner(thirdPred, third);
+    if (predWin) {
+      const predLoser = loserOfOfficialMatch(
+        third.home_team_id,
+        third.away_team_id,
+        predWin,
+      );
+      if (predLoser && predLoser === honor.fourth_place_team_id) {
+        b.fourthPlacePoints += SCORING_RULES.honorBoard.fourthPlace;
+      }
     }
   }
 

@@ -12,22 +12,49 @@ type PredMatch = {
   winner_team_id: string | null;
 };
 
+/** Campos mínimos para inferir ganador (partidos oficiales o contexto de predicción). */
+export type ScoringMatchLike = {
+  home_team_id: string | null;
+  away_team_id: string | null;
+  home_goals: number | null;
+  away_goals: number | null;
+  winner_team_id: string | null;
+};
+
 const outcome = (h: number, a: number): 'h' | 'a' | 'd' => {
   if (h > a) return 'h';
   if (a > h) return 'a';
   return 'd';
 };
 
-const actualWinnerFromMatch = (m: MatchRow): string | null => {
+export const actualWinnerFromMatch = (m: ScoringMatchLike): string | null => {
   if (m.home_goals == null || m.away_goals == null) return null;
-  if (m.winner_team_id) return m.winner_team_id;
+  if (
+    m.winner_team_id &&
+    m.home_team_id &&
+    m.away_team_id &&
+    (m.winner_team_id === m.home_team_id || m.winner_team_id === m.away_team_id)
+  ) {
+    return m.winner_team_id;
+  }
   if (m.home_goals > m.away_goals) return m.home_team_id;
   if (m.away_goals > m.home_goals) return m.away_team_id;
   return null;
 };
 
-const predictedWinner = (p: PredMatch, m: MatchRow): string | null => {
-  if (p.winner_team_id) return p.winner_team_id;
+/**
+ * Predicción: ganador explícito solo si es uno de los dos equipos del partido; si no,
+ * se infiere por goles (evita winner_team_id obsoleto vs cuadro actual).
+ */
+export const predictedWinner = (p: PredMatch, m: ScoringMatchLike): string | null => {
+  if (
+    p.winner_team_id &&
+    m.home_team_id &&
+    m.away_team_id &&
+    (p.winner_team_id === m.home_team_id || p.winner_team_id === m.away_team_id)
+  ) {
+    return p.winner_team_id;
+  }
   return actualWinnerFromMatch({
     ...m,
     home_goals: p.home_goals,
@@ -275,7 +302,6 @@ export const scoreHonorFromBracket = (
   const predFinal = preds.find((p) => p.match_id === finalM.id);
   const predThird = thirdM?.id ? preds.find((p) => p.match_id === thirdM.id) : undefined;
 
-  const fw = finalM.home_goals != null ? actualWinnerFromMatch(finalM) : null;
   const predChamp = predFinal ? predictedWinner(predFinal, finalM) : null;
 
   let champion = 0;
@@ -284,11 +310,19 @@ export const scoreHonorFromBracket = (
   }
 
   let runnerUp = 0;
-  if (real.runner_up_team_id && fw && finalM.home_team_id && finalM.away_team_id) {
-    const loser =
-      fw === finalM.home_team_id ? finalM.away_team_id : finalM.home_team_id;
-    if (loser === real.runner_up_team_id) {
-      runnerUp = SCORING_RULES.honorBoard.runnerUp;
+  if (
+    real.runner_up_team_id &&
+    finalM.home_team_id &&
+    finalM.away_team_id &&
+    predFinal
+  ) {
+    const pw = predictedWinner(predFinal, finalM);
+    if (pw) {
+      const other =
+        pw === finalM.home_team_id ? finalM.away_team_id : finalM.home_team_id;
+      if (other === real.runner_up_team_id) {
+        runnerUp = SCORING_RULES.honorBoard.runnerUp;
+      }
     }
   }
 
@@ -307,12 +341,12 @@ export const scoreHonorFromBracket = (
   }
 
   let fourth = 0;
-  if (real.fourth_place_team_id && thirdM && thirdM.home_goals != null) {
-    const tw = actualWinnerFromMatch(thirdM);
-    if (tw && thirdM.home_team_id && thirdM.away_team_id) {
-      const tl =
-        tw === thirdM.home_team_id ? thirdM.away_team_id : thirdM.home_team_id;
-      if (tl === real.fourth_place_team_id) {
+  if (real.fourth_place_team_id && thirdM && thirdM.home_goals != null && predThird) {
+    const pw = predictedWinner(predThird, thirdM);
+    if (pw && thirdM.home_team_id && thirdM.away_team_id) {
+      const predLoser =
+        pw === thirdM.home_team_id ? thirdM.away_team_id : thirdM.home_team_id;
+      if (predLoser === real.fourth_place_team_id) {
         fourth = SCORING_RULES.honorBoard.fourthPlace;
       }
     }
