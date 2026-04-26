@@ -203,8 +203,11 @@ DECLARE
   v_pred_special      RECORD;
   v_predicted_champ   TEXT;
   v_final_other       TEXT;
-  v_predicted_third   TEXT;
   v_third_loser       TEXT;
+  v_official_champ    TEXT;
+  v_official_ru       TEXT;
+  v_official_third    TEXT;
+  v_official_fourth   TEXT;
 BEGIN
   SELECT id INTO v_prediction_id
   FROM public.predictions
@@ -321,79 +324,105 @@ BEGIN
   );
 
   -- =========================================================================
-  -- 5) CHAMPION / RUNNER-UP / THIRD / FOURTH from real_results
+  -- 5) CHAMPION / RUNNER-UP / THIRD / FOURTH from official matches 104 and 103
+  --    Goleador / figura: real_results
   -- =========================================================================
   SELECT * INTO v_real FROM public.real_results LIMIT 1;
   SELECT * INTO v_pred_special
   FROM public.prediction_specials WHERE prediction_id = v_prediction_id;
 
+  SELECT
+    f.winner_team_id,
+    CASE
+      WHEN f.winner_team_id = f.home_team_id THEN f.away_team_id
+      WHEN f.winner_team_id = f.away_team_id THEN f.home_team_id
+      ELSE NULL
+    END
+  INTO v_official_champ, v_official_ru
+  FROM public.matches f
+  WHERE f.match_number = 104
+    AND f.home_team_id IS NOT NULL
+    AND f.away_team_id IS NOT NULL
+    AND f.winner_team_id IS NOT NULL
+  LIMIT 1;
+
+  SELECT
+    t.winner_team_id,
+    CASE
+      WHEN t.winner_team_id = t.home_team_id THEN t.away_team_id
+      WHEN t.winner_team_id = t.away_team_id THEN t.home_team_id
+      ELSE NULL
+    END
+  INTO v_official_third, v_official_fourth
+  FROM public.matches t
+  WHERE t.match_number = 103
+    AND t.home_team_id IS NOT NULL
+    AND t.away_team_id IS NOT NULL
+    AND t.winner_team_id IS NOT NULL
+  LIMIT 1;
+
+  IF v_official_champ IS NOT NULL THEN
+    SELECT pm.winner_team_id INTO v_predicted_champ
+    FROM public.prediction_matches pm
+    JOIN public.matches m ON m.id = pm.match_id
+    WHERE pm.prediction_id = v_prediction_id
+      AND (m.match_number = 104 OR m.stage = 'final')
+    LIMIT 1;
+
+    IF v_predicted_champ = v_official_champ THEN
+      v_champion_pts := 180;
+    END IF;
+  END IF;
+
+  IF v_official_ru IS NOT NULL THEN
+    SELECT
+      CASE
+        WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
+        WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+        ELSE NULL
+      END INTO v_final_other
+    FROM public.prediction_matches pm
+    JOIN public.matches m ON m.id = pm.match_id
+    WHERE pm.prediction_id = v_prediction_id
+      AND (m.match_number = 104 OR m.stage = 'final')
+    LIMIT 1;
+
+    IF v_final_other IS NOT NULL AND v_final_other = v_official_ru THEN
+      v_runner_up_pts := 100;
+    END IF;
+  END IF;
+
+  IF v_official_third IS NOT NULL THEN
+    PERFORM 1
+    FROM public.prediction_matches pm
+    JOIN public.matches m ON m.id = pm.match_id
+    WHERE pm.prediction_id = v_prediction_id
+      AND (m.match_number = 103 OR m.stage = 'third-place')
+      AND pm.winner_team_id = v_official_third;
+    IF FOUND THEN
+      v_third_pts := 100;
+    END IF;
+  END IF;
+
+  IF v_official_fourth IS NOT NULL THEN
+    SELECT
+      CASE
+        WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
+        WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+        ELSE NULL
+      END INTO v_third_loser
+    FROM public.prediction_matches pm
+    JOIN public.matches m ON m.id = pm.match_id
+    WHERE pm.prediction_id = v_prediction_id
+      AND (m.match_number = 103 OR m.stage = 'third-place')
+    LIMIT 1;
+
+    IF v_third_loser IS NOT NULL AND v_third_loser = v_official_fourth THEN
+      v_fourth_pts := 100;
+    END IF;
+  END IF;
+
   IF v_real IS NOT NULL THEN
-    -- Champion = user's predicted final match winner
-    IF v_real.champion_team_id IS NOT NULL THEN
-      SELECT pm.winner_team_id INTO v_predicted_champ
-      FROM public.prediction_matches pm
-      JOIN public.matches m ON m.id = pm.match_id
-      WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'final'
-      LIMIT 1;
-
-      IF v_predicted_champ = v_real.champion_team_id THEN
-        v_champion_pts := 180;
-      END IF;
-    END IF;
-
-    -- Runner-up = predicted losing finalist in the final match (other side vs predicted winner)
-    IF v_real.runner_up_team_id IS NOT NULL THEN
-      SELECT
-        CASE
-          WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
-          WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
-          ELSE NULL
-        END INTO v_final_other
-      FROM public.prediction_matches pm
-      JOIN public.matches m ON m.id = pm.match_id
-      WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'final'
-      LIMIT 1;
-
-      IF v_final_other IS NOT NULL AND v_final_other = v_real.runner_up_team_id THEN
-        v_runner_up_pts := 100;
-      END IF;
-    END IF;
-
-    -- Third place = user's predicted third-place match winner
-    IF v_real.third_place_team_id IS NOT NULL THEN
-      SELECT pm.winner_team_id INTO v_predicted_third
-      FROM public.prediction_matches pm
-      JOIN public.matches m ON m.id = pm.match_id
-      WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'third-place'
-      LIMIT 1;
-
-      IF v_predicted_third = v_real.third_place_team_id THEN
-        v_third_pts := 100;
-      END IF;
-    END IF;
-
-    -- Fourth = predicted losing team in the third-place match
-    IF v_real.fourth_place_team_id IS NOT NULL THEN
-      SELECT
-        CASE
-          WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
-          WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
-          ELSE NULL
-        END INTO v_third_loser
-      FROM public.prediction_matches pm
-      JOIN public.matches m ON m.id = pm.match_id
-      WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'third-place'
-      LIMIT 1;
-
-      IF v_third_loser IS NOT NULL AND v_third_loser = v_real.fourth_place_team_id THEN
-        v_fourth_pts := 100;
-      END IF;
-    END IF;
-
     -- Top scorer: case-insensitive; trim; collapse internal whitespace (match app normalizer)
     IF v_real.top_scorer IS NOT NULL
        AND v_pred_special IS NOT NULL

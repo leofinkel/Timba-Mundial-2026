@@ -30,10 +30,6 @@ export const getLatestRealResults = async (
 export type SaveSpecialResultsInput = {
   topScorer: string | null;
   bestPlayer: string | null;
-  championTeamId: string | null;
-  runnerUpTeamId: string | null;
-  thirdPlaceTeamId: string | null;
-  fourthPlaceTeamId: string | null;
 };
 
 export const upsertLatestRealResults = async (
@@ -45,10 +41,6 @@ export const upsertLatestRealResults = async (
   const payload = {
     top_scorer: input.topScorer,
     best_player: input.bestPlayer,
-    champion_team_id: input.championTeamId,
-    runner_up_team_id: input.runnerUpTeamId,
-    third_place_team_id: input.thirdPlaceTeamId,
-    fourth_place_team_id: input.fourthPlaceTeamId,
   };
 
   if (latest?.id) {

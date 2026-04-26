@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,40 +11,17 @@ import { KnockoutBracket } from '@/components/fixture/KnockoutBracket';
 import { SpecialPredictions } from '@/components/fixture/SpecialPredictions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  buildAllTeamsList,
-  buildTournamentTeamSelectOptions,
-  useAdminFixtureResults,
-} from '@/hooks/useAdminFixtureResults';
+import { buildAllTeamsList, useAdminFixtureResults } from '@/hooks/useAdminFixtureResults';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { Tournament } from '@/types/tournament';
 
-const UNSET = '__unset__';
-
 type OfficialFormState = {
-  championTeamId: string;
-  runnerUpTeamId: string;
-  thirdPlaceTeamId: string;
-  fourthPlaceTeamId: string;
   topScorer: string;
   bestPlayer: string;
 };
 
 const rowToFormState = (row: RealResultsRow | null): OfficialFormState => ({
-  championTeamId: row?.champion_team_id ?? UNSET,
-  runnerUpTeamId: row?.runner_up_team_id ?? UNSET,
-  thirdPlaceTeamId: row?.third_place_team_id ?? UNSET,
-  fourthPlaceTeamId: row?.fourth_place_team_id ?? UNSET,
   topScorer: row?.top_scorer ?? '',
   bestPlayer: row?.best_player ?? '',
 });
@@ -79,10 +56,6 @@ export const AdminFixtureResultTabs = ({
   } = useAdminFixtureResults({ tournament });
 
   const allTeams = buildAllTeamsList(tournament);
-  const honorBoardTeams = useMemo(
-    () => buildTournamentTeamSelectOptions(tournament),
-    [tournament],
-  );
   const [pendingMatches, startMatchSave] = useTransition();
   const [pendingSpecial, startSpecialSave] = useTransition();
 
@@ -119,21 +92,8 @@ export const AdminFixtureResultTabs = ({
       toast.error('Completá goleador y mejor jugador');
       return;
     }
-    if (
-      specialForm.championTeamId === UNSET ||
-      specialForm.runnerUpTeamId === UNSET ||
-      specialForm.thirdPlaceTeamId === UNSET ||
-      specialForm.fourthPlaceTeamId === UNSET
-    ) {
-      toast.error('Seleccioná las cuatro selecciones');
-      return;
-    }
     startSpecialSave(async () => {
       const res = await saveSpecialResultsAction({
-        championTeamId: specialForm.championTeamId,
-        runnerUpTeamId: specialForm.runnerUpTeamId,
-        thirdPlaceTeamId: specialForm.thirdPlaceTeamId,
-        fourthPlaceTeamId: specialForm.fourthPlaceTeamId,
         topScorer: specialForm.topScorer.trim(),
         bestPlayer: specialForm.bestPlayer.trim(),
       });
@@ -141,7 +101,7 @@ export const AdminFixtureResultTabs = ({
         toast.error(res.error);
         return;
       }
-      toast.success('Resultados especiales guardados. Puntajes recalculados.');
+      toast.success('Goleador y figura guardados. Puntajes recalculados.');
       router.refresh();
     });
   }, [router, specialForm]);
@@ -174,7 +134,7 @@ export const AdminFixtureResultTabs = ({
             value="specials"
             className="text-zinc-300 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
           >
-            Resultados especiales
+            Goleador y figura
           </TabsTrigger>
         </TabsList>
 
@@ -201,121 +161,29 @@ export const AdminFixtureResultTabs = ({
         </TabsContent>
 
         <TabsContent value="specials" className="mt-4 space-y-6">
-          <SpecialPredictions
-            topScorer={specialForm.topScorer}
-            bestPlayer={specialForm.bestPlayer}
-            onTopScorerChange={(v) => updateSpecial({ topScorer: v })}
-            onBestPlayerChange={(v) => updateSpecial({ bestPlayer: v })}
-            disabled={pendingSpecial}
-          />
-
           <Card className="border-zinc-800/80 shadow-md">
             <CardHeader>
-              <CardTitle>Honor board</CardTitle>
-              <CardDescription>Campeón, podio y cierre (comparan con predicción en puntajes)</CardDescription>
+              <CardTitle>Goleador y figura del torneo</CardTitle>
+              <CardDescription>
+                Campeón, subcampeón, 3.º y 4.º puesto se toman de los partidos 103 y
+                104 (resultados oficiales en Eliminatorias).
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Campeón</Label>
-                  <Select
-                    value={specialForm.championTeamId}
-                    onValueChange={(v) => updateSpecial({ championTeamId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <ScrollArea className="h-[min(50vh,280px)]">
-                        <SelectItem value={UNSET} disabled>
-                          Seleccionar…
-                        </SelectItem>
-                        {honorBoardTeams.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </ScrollArea>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subcampeón</Label>
-                  <Select
-                    value={specialForm.runnerUpTeamId}
-                    onValueChange={(v) => updateSpecial({ runnerUpTeamId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <ScrollArea className="h-[min(50vh,280px)]">
-                        <SelectItem value={UNSET} disabled>
-                          Seleccionar…
-                        </SelectItem>
-                        {honorBoardTeams.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </ScrollArea>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>3.er puesto</Label>
-                  <Select
-                    value={specialForm.thirdPlaceTeamId}
-                    onValueChange={(v) => updateSpecial({ thirdPlaceTeamId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <ScrollArea className="h-[min(50vh,280px)]">
-                        <SelectItem value={UNSET} disabled>
-                          Seleccionar…
-                        </SelectItem>
-                        {honorBoardTeams.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </ScrollArea>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>4.º puesto</Label>
-                  <Select
-                    value={specialForm.fourthPlaceTeamId}
-                    onValueChange={(v) => updateSpecial({ fourthPlaceTeamId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <ScrollArea className="h-[min(50vh,280px)]">
-                        <SelectItem value={UNSET} disabled>
-                          Seleccionar…
-                        </SelectItem>
-                        {honorBoardTeams.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </ScrollArea>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <SpecialPredictions
+                topScorer={specialForm.topScorer}
+                bestPlayer={specialForm.bestPlayer}
+                onTopScorerChange={(v) => updateSpecial({ topScorer: v })}
+                onBestPlayerChange={(v) => updateSpecial({ bestPlayer: v })}
+                disabled={pendingSpecial}
+              />
               <Button
                 type="button"
                 variant="secondary"
                 disabled={pendingSpecial}
                 onClick={handleSpecialSave}
               >
-                Guardar honor board
+                Guardar goleador y figura
               </Button>
             </CardContent>
           </Card>

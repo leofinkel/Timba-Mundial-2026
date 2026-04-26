@@ -391,10 +391,6 @@ export const saveSpecialResults = async (
     const payload = {
       top_scorer: data.topScorer,
       best_player: data.bestPlayer,
-      champion_team_id: data.championTeamId,
-      runner_up_team_id: data.runnerUpTeamId,
-      third_place_team_id: data.thirdPlaceTeamId,
-      fourth_place_team_id: data.fourthPlaceTeamId,
       updated_at: new Date().toISOString(),
     };
 

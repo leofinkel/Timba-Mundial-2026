@@ -121,12 +121,8 @@ export type FinishedMatchResult = {
   playedAt: string | null;
 };
 
-/** Admin-maintained honor results (`real_results` row). */
+/** Admin-maintained goleador / figura (`real_results` row). El honor (campeón, etc.) sale de los partidos 103 y 104. */
 export type OfficialSpecialResultsInput = {
   topScorer: string;
   bestPlayer: string;
-  championTeamId: string;
-  runnerUpTeamId: string;
-  thirdPlaceTeamId: string;
-  fourthPlaceTeamId: string;
 };

@@ -10,6 +10,7 @@ const log = createServiceLogger('scoringService');
 
 type MatchRow = {
   id: string;
+  match_number: number;
   stage: string;
   group_id: string | null;
   home_team_id: string | null;
@@ -32,13 +33,54 @@ type StandingRow = { group_id: string; team_id: string; position: number };
 
 type SpecialRow = { top_scorer: string; best_player: string };
 
+/** Solo goleador / figura en `real_results`. Campeón, podio, 4.º: partidos 103 y 104. */
 type RealResultsRow = {
   top_scorer: string | null;
   best_player: string | null;
-  champion_team_id: string | null;
-  runner_up_team_id: string | null;
-  third_place_team_id: string | null;
-  fourth_place_team_id: string | null;
+};
+
+type OfficialHonor = {
+  champion_team_id: string;
+  runner_up_team_id: string;
+  third_place_team_id: string;
+  fourth_place_team_id: string;
+};
+
+const loserOfOfficialMatch = (
+  home: string | null,
+  away: string | null,
+  winner: string | null,
+): string | null => {
+  if (!home || !away || !winner) return null;
+  if (winner === home) return away;
+  if (winner === away) return home;
+  return null;
+};
+
+/** Partido 104 = final, 103 = 3.º/4.º; si faltan números, se usa el único partido por stage. */
+const deriveOfficialHonorFromMatches = (matches: MatchRow[]): OfficialHonor | null => {
+  const m104 = matches.find((m) => m.match_number === 104) ?? matches.find((m) => m.stage === 'final');
+  const m103 = matches.find((m) => m.match_number === 103) ?? matches.find((m) => m.stage === 'third-place');
+  if (!m104 || !m103) return null;
+  if (!m104.home_team_id || !m104.away_team_id || !m104.winner_team_id) return null;
+  if (!m103.home_team_id || !m103.away_team_id || !m103.winner_team_id) return null;
+  const ru = loserOfOfficialMatch(
+    m104.home_team_id,
+    m104.away_team_id,
+    m104.winner_team_id,
+  );
+  const fourth = loserOfOfficialMatch(
+    m103.home_team_id,
+    m103.away_team_id,
+    m103.winner_team_id,
+  );
+  if (!ru || !fourth) return null;
+  return {
+    champion_team_id: m104.winner_team_id,
+    runner_up_team_id: ru,
+    third_place_team_id: m103.winner_team_id,
+    fourth_place_team_id: fourth,
+  };
 };
 
 type MutableBreakdown = {
@@ -290,24 +332,29 @@ const computeForPrediction = (params: {
     }
   }
 
-  const final = params.matches.find((m) => m.stage === 'final');
-  const third = params.matches.find((m) => m.stage === 'third-place');
+  const final =
+    params.matches.find((m) => m.match_number === 104) ??
+    params.matches.find((m) => m.stage === 'final');
+  const third =
+    params.matches.find((m) => m.match_number === 103) ??
+    params.matches.find((m) => m.stage === 'third-place');
   const finalPred = final
     ? params.predMatches.find((p) => p.match_id === final.id)
     : undefined;
   const thirdPred = third
     ? params.predMatches.find((p) => p.match_id === third.id)
     : undefined;
+  const honor = deriveOfficialHonorFromMatches(params.matches);
   const rr = params.real;
 
-  if (rr?.champion_team_id && finalPred?.winner_team_id) {
-    if (finalPred.winner_team_id === rr.champion_team_id) {
+  if (honor && finalPred?.winner_team_id) {
+    if (finalPred.winner_team_id === honor.champion_team_id) {
       b.championPoints += SCORING_RULES.honorBoard.champion;
     }
   }
 
   if (
-    rr?.runner_up_team_id &&
+    honor &&
     final &&
     final.home_team_id &&
     final.away_team_id &&
@@ -319,31 +366,24 @@ const computeForPrediction = (params: {
         : finalPred.winner_team_id === final.away_team_id
           ? final.home_team_id
           : null;
-    if (other && other === rr.runner_up_team_id) {
+    if (other && other === honor.runner_up_team_id) {
       b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
     }
   }
 
-  if (rr?.third_place_team_id && thirdPred?.winner_team_id) {
-    if (thirdPred.winner_team_id === rr.third_place_team_id) {
+  if (honor && thirdPred?.winner_team_id) {
+    if (thirdPred.winner_team_id === honor.third_place_team_id) {
       b.thirdPlacePoints += SCORING_RULES.honorBoard.thirdPlace;
     }
   }
 
-  if (
-    rr?.fourth_place_team_id &&
-    third &&
-    third.home_team_id &&
-    third.away_team_id &&
-    thirdPred?.winner_team_id
-  ) {
-    const loser =
-      thirdPred.winner_team_id === third.home_team_id
-        ? third.away_team_id
-        : thirdPred.winner_team_id === third.away_team_id
-          ? third.home_team_id
-          : null;
-    if (loser && loser === rr.fourth_place_team_id) {
+  if (honor && third && third.home_team_id && third.away_team_id && thirdPred?.winner_team_id) {
+    const predLoser = loserOfOfficialMatch(
+      third.home_team_id,
+      third.away_team_id,
+      thirdPred.winner_team_id,
+    );
+    if (predLoser && predLoser === honor.fourth_place_team_id) {
       b.fourthPlacePoints += SCORING_RULES.honorBoard.fourthPlace;
     }
   }
@@ -464,7 +504,7 @@ export const calculateAllScores = async (): Promise<{
     const { data: matches, error: me } = await supabase
       .from('matches')
       .select(
-        'id, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
+        'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
       );
 
     if (me) {
@@ -474,9 +514,7 @@ export const calculateAllScores = async (): Promise<{
 
     const { data: real, error: re } = await supabase
       .from('real_results')
-      .select(
-        'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
-      )
+      .select('top_scorer, best_player')
       .limit(1)
       .maybeSingle();
 
@@ -620,7 +658,7 @@ export const calculateUserScore = async (
     const { data: matches, error: me } = await supabase
       .from('matches')
       .select(
-        'id, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
+        'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
       );
 
     if (me) {
@@ -629,9 +667,7 @@ export const calculateUserScore = async (
 
     const { data: real, error: re } = await supabase
       .from('real_results')
-      .select(
-        'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
-      )
+      .select('top_scorer, best_player')
       .limit(1)
       .maybeSingle();
 

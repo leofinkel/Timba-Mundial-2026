@@ -56,10 +56,6 @@ export const saveSpecialPredictionsSchema = z.object({
 export const targetUserIdSchema = z.string().uuid('Usuario inválido');
 
 export const saveSpecialResultsSchema = z.object({
-  championTeamId: z.string().min(1),
-  runnerUpTeamId: z.string().min(1),
-  thirdPlaceTeamId: z.string().min(1),
-  fourthPlaceTeamId: z.string().min(1),
   topScorer: z.string().min(1),
   bestPlayer: z.string().min(1),
 });
