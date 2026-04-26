@@ -202,9 +202,9 @@ DECLARE
   v_real              RECORD;
   v_pred_special      RECORD;
   v_predicted_champ   TEXT;
-  v_predicted_runnerup TEXT;
+  v_final_other       TEXT;
   v_predicted_third   TEXT;
-  v_predicted_fourth  TEXT;
+  v_third_loser       TEXT;
 BEGIN
   SELECT id INTO v_prediction_id
   FROM public.predictions
@@ -342,18 +342,21 @@ BEGIN
       END IF;
     END IF;
 
-    -- Runner-up = the other finalist in user's prediction (SF winner that is NOT champion)
+    -- Runner-up = predicted losing finalist in the final match (other side vs predicted winner)
     IF v_real.runner_up_team_id IS NOT NULL THEN
-      SELECT pm.winner_team_id INTO v_predicted_runnerup
+      SELECT
+        CASE
+          WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
+          WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+          ELSE NULL
+        END INTO v_final_other
       FROM public.prediction_matches pm
       JOIN public.matches m ON m.id = pm.match_id
       WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'semi-finals'
-        AND pm.winner_team_id IS NOT NULL
-        AND pm.winner_team_id <> COALESCE(v_predicted_champ, '')
+        AND m.stage = 'final'
       LIMIT 1;
 
-      IF v_predicted_runnerup = v_real.runner_up_team_id THEN
+      IF v_final_other IS NOT NULL AND v_final_other = v_real.runner_up_team_id THEN
         v_runner_up_pts := 100;
       END IF;
     END IF;
@@ -372,39 +375,21 @@ BEGIN
       END IF;
     END IF;
 
-    -- Fourth place = the other team in user's third-place match (the loser)
-    -- That is the SF loser that is NOT the third-place winner.
+    -- Fourth = predicted losing team in the third-place match
     IF v_real.fourth_place_team_id IS NOT NULL THEN
-      SELECT pm.winner_team_id INTO v_predicted_fourth
+      SELECT
+        CASE
+          WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
+          WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+          ELSE NULL
+        END INTO v_third_loser
       FROM public.prediction_matches pm
       JOIN public.matches m ON m.id = pm.match_id
       WHERE pm.prediction_id = v_prediction_id
-        AND m.stage = 'semi-finals'
-        AND pm.winner_team_id IS NULL
+        AND m.stage = 'third-place'
       LIMIT 1;
 
-      -- Simpler: SF losers are the teams NOT selected as winners.
-      -- Fourth = the SF loser that is NOT the third-place winner.
-      -- We check from prediction: the two SF losers are implicit.
-      -- But since we don't store them explicitly, we use a different approach:
-      -- if any of the user's QF winners that lost in their predicted SF
-      -- matches the real fourth-place team, award points.
-      PERFORM 1
-      FROM public.prediction_matches pm_qf
-      JOIN public.matches m_qf ON m_qf.id = pm_qf.match_id
-      WHERE pm_qf.prediction_id = v_prediction_id
-        AND m_qf.stage = 'quarter-finals'
-        AND pm_qf.winner_team_id = v_real.fourth_place_team_id
-        AND pm_qf.winner_team_id NOT IN (
-          SELECT pm_sf.winner_team_id
-          FROM public.prediction_matches pm_sf
-          JOIN public.matches m_sf ON m_sf.id = pm_sf.match_id
-          WHERE pm_sf.prediction_id = v_prediction_id
-            AND m_sf.stage = 'semi-finals'
-            AND pm_sf.winner_team_id IS NOT NULL
-        );
-
-      IF FOUND THEN
+      IF v_third_loser IS NOT NULL AND v_third_loser = v_real.fourth_place_team_id THEN
         v_fourth_pts := 100;
       END IF;
     END IF;

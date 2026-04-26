@@ -9,6 +9,114 @@ import { isAdmin } from '@/services/adminService';
 
 const log = createServiceLogger('resultService');
 
+/** Losing team in a match given a valid winner. */
+const loserOfMatch = (
+  homeTeamId: string | null,
+  awayTeamId: string | null,
+  winnerTeamId: string | null,
+): string | null => {
+  if (!homeTeamId || !awayTeamId || !winnerTeamId) return null;
+  if (winnerTeamId === homeTeamId) return awayTeamId;
+  if (winnerTeamId === awayTeamId) return homeTeamId;
+  return null;
+};
+
+/**
+ * Keeps `real_results` honor columns aligned with official match 104 (final) and
+ * 103 (3rd/4th): champion/subcampeón and tercero/cuarto from ganador/perdedor.
+ */
+const syncHonorBoardRealResults = async (
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  row: {
+    stage: string;
+    home_team_id: string | null;
+    away_team_id: string | null;
+    winner_team_id: string | null;
+  },
+): Promise<void> => {
+  if (row.stage !== 'final' && row.stage !== 'third-place') return;
+  const loser = loserOfMatch(
+    row.home_team_id,
+    row.away_team_id,
+    row.winner_team_id,
+  );
+  if (!row.winner_team_id || !loser) return;
+
+  const { data: existing, error: exErr } = await supabase
+    .from('real_results')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+  if (exErr) {
+    log.warn({ err: exErr }, 'syncHonorBoardRealResults: read failed');
+    return;
+  }
+  const now = new Date().toISOString();
+  if (row.stage === 'final') {
+    const payload = {
+      champion_team_id: row.winner_team_id,
+      runner_up_team_id: loser,
+      updated_at: now,
+    };
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('real_results')
+        .update(payload)
+        .eq('id', existing.id);
+      if (error) log.warn({ err: error }, 'syncHonorBoardRealResults: final update');
+    } else {
+      const { error } = await supabase.from('real_results').insert(payload);
+      if (error) log.warn({ err: error }, 'syncHonorBoardRealResults: final insert');
+    }
+    return;
+  }
+  const payload = {
+    third_place_team_id: row.winner_team_id,
+    fourth_place_team_id: loser,
+    updated_at: now,
+  };
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('real_results')
+      .update(payload)
+      .eq('id', existing.id);
+    if (error) log.warn({ err: error }, 'syncHonorBoardRealResults: 3rd update');
+  } else {
+    const { error } = await supabase.from('real_results').insert(payload);
+    if (error) log.warn({ err: error }, 'syncHonorBoardRealResults: 3rd insert');
+  }
+};
+
+const clearHonorBoardFieldsForStage = async (
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  stage: string,
+): Promise<void> => {
+  if (stage !== 'final' && stage !== 'third-place') return;
+  const { data: existing, error: exErr } = await supabase
+    .from('real_results')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+  if (exErr || !existing?.id) return;
+  const payload =
+    stage === 'final'
+      ? {
+          champion_team_id: null,
+          runner_up_team_id: null,
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          third_place_team_id: null,
+          fourth_place_team_id: null,
+          updated_at: new Date().toISOString(),
+        };
+  const { error } = await supabase
+    .from('real_results')
+    .update(payload)
+    .eq('id', existing.id);
+  if (error) log.warn({ err: error, stage }, 'clearHonorBoardFieldsForStage');
+};
+
 const winnerFromGoals = (
   homeGoals: number,
   awayGoals: number,
@@ -79,6 +187,13 @@ export const saveMatchResult = async (
 
     log.info({ matchId, adminId, stage: match.stage }, 'Match result saved');
 
+    await syncHonorBoardRealResults(supabase, {
+      stage: updated.stage,
+      home_team_id: updated.home_team_id,
+      away_team_id: updated.away_team_id,
+      winner_team_id: updated.winner_team_id,
+    });
+
     if (match.stage === 'group') {
       try {
         await populateRoundOf32();
@@ -119,6 +234,17 @@ export const clearMatchResult = async (matchId: string, adminId: string): Promis
   }
 
   const supabase = await createServerClient();
+  const { data: before, error: fetchErr } = await supabase
+    .from('matches')
+    .select('stage')
+    .eq('id', matchId)
+    .single();
+
+  if (fetchErr) {
+    log.error({ err: fetchErr, matchId }, 'clearMatchResult fetch failed');
+    throw new Error(fetchErr.message);
+  }
+
   const { error } = await supabase
     .from('matches')
     .update({
@@ -132,6 +258,10 @@ export const clearMatchResult = async (matchId: string, adminId: string): Promis
   if (error) {
     log.error({ err: error, matchId }, 'clearMatchResult update failed');
     throw new Error(error.message);
+  }
+
+  if (before?.stage) {
+    await clearHonorBoardFieldsForStage(supabase, before.stage);
   }
 
   log.info({ matchId, adminId }, 'Match result cleared');
@@ -168,6 +298,13 @@ export const saveKnockoutWinner = async (
     log.info({ matchId, winnerTeamId, adminId }, 'Knockout winner set');
 
     await advanceKnockoutWinner(matchId, winnerTeamId);
+
+    await syncHonorBoardRealResults(supabase, {
+      stage: updated.stage,
+      home_team_id: updated.home_team_id,
+      away_team_id: updated.away_team_id,
+      winner_team_id: updated.winner_team_id,
+    });
 
     return {
       matchId: updated.id,
