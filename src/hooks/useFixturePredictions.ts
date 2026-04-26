@@ -9,6 +9,7 @@ import {
   type GroupMatchScoresInput,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
+import { honorPairFromWinnerAndOpponent } from '@/lib/knockout/honorMatchPrediction';
 import { resolveR32MatchTeamSlotsFromStandings } from '@/lib/knockout/resolveR32MatchTeamSlots';
 import type {
   GroupMatchPrediction,
@@ -147,13 +148,28 @@ const buildKnockoutPredictionState = (
     const ex = byId.get(m.id);
     const homeTeamId = ex?.homeTeamId ?? m.homeTeam?.id ?? '';
     const awayTeamId = ex?.awayTeamId ?? m.awayTeam?.id ?? '';
+    let honorFirstTeamId = ex?.honorFirstTeamId ?? '';
+    let honorSecondTeamId = ex?.honorSecondTeamId ?? '';
+    if (
+      (m.matchNumber === 103 || m.matchNumber === 104) &&
+      ex?.winnerId &&
+      homeTeamId &&
+      awayTeamId &&
+      (!honorFirstTeamId || !honorSecondTeamId)
+    ) {
+      const pair = honorPairFromWinnerAndOpponent(homeTeamId, awayTeamId, ex.winnerId);
+      honorFirstTeamId = pair.honorFirstTeamId;
+      honorSecondTeamId = pair.honorSecondTeamId;
+    }
     state[m.id] = {
       matchId: m.id,
       homeTeamId,
       awayTeamId,
-      homeGoals: 0,
-      awayGoals: 0,
+      homeGoals: ex?.homeGoals ?? 0,
+      awayGoals: ex?.awayGoals ?? 0,
       winnerId: ex?.winnerId ?? '',
+      honorFirstTeamId,
+      honorSecondTeamId,
     };
   }
   return state;
@@ -336,7 +352,17 @@ export const useFixturePredictions = ({
           ) {
             winnerId = '';
           }
-          next[matchId] = { ...cur, ...teams, winnerId };
+          const ko = tournament.knockoutMatches.find((x) => x.id === matchId);
+          const clearHonor =
+            ko && (ko.matchNumber === 103 || ko.matchNumber === 104);
+          next[matchId] = {
+            ...cur,
+            ...teams,
+            winnerId,
+            ...(clearHonor
+              ? { honorFirstTeamId: '', honorSecondTeamId: '', homeGoals: 0, awayGoals: 0 }
+              : {}),
+          };
         }
       }
 
@@ -427,7 +453,7 @@ export const useFixturePredictions = ({
         const updated: KnockoutMatchPrediction = { ...cur, ...patch };
         let next = { ...prev, [matchId]: updated };
 
-        if (patch.winnerId) {
+        if (patch.winnerId != null || patch.honorFirstTeamId != null) {
           next = cascadeWinner(next, matchId);
         }
 
@@ -473,6 +499,8 @@ export const useFixturePredictions = ({
             homeGoals: p?.homeGoals ?? 0,
             awayGoals: p?.awayGoals ?? 0,
             winnerId: p?.winnerId ?? '',
+            honorFirstTeamId: p?.honorFirstTeamId,
+            honorSecondTeamId: p?.honorSecondTeamId,
           };
         });
 

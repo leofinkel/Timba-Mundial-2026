@@ -14,6 +14,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TeamFlag } from '@/components/fixture/TeamFlag';
+import {
+  completedHonorPair,
+  goalsAndWinnerForHonorFirst,
+  isHonorPlacementMatch,
+  matchLabelForHonorRole,
+} from '@/lib/knockout/honorMatchPrediction';
 import type { KnockoutMatchPrediction } from '@/types/prediction';
 import type { KnockoutMatch, Team } from '@/types/tournament';
 
@@ -71,11 +77,46 @@ export const KnockoutMatchCard = ({
     null;
 
   const bothResolved = !!homeResolved && !!awayResolved;
+  const isHonorMatch = isHonorPlacementMatch(match);
+
+  const honorFirst = prediction.honorFirstTeamId?.trim() ?? '';
+  const honorSecond = prediction.honorSecondTeamId?.trim() ?? '';
+  const honorLabels = matchLabelForHonorRole(match);
+
+  const firstPlaceTeam =
+    bothResolved && honorFirst
+      ? allTeams.find((t) => t.id === honorFirst) ?? null
+      : null;
 
   const winner =
     bothResolved && prediction.winnerId
       ? allTeams.find((t) => t.id === prediction.winnerId) ?? null
       : null;
+
+  const secondTeam =
+    bothResolved && honorFirst && honorSecond && homeResolved && awayResolved
+      ? allTeams.find((t) => t.id === honorSecond) ?? null
+      : null;
+
+  const applyHonorChange = (
+    nextFirst: string,
+    nextSecond: string,
+  ) => {
+    if (!homeResolved || !awayResolved) return;
+    let f = nextFirst;
+    let s = nextSecond;
+    if (f && s && f === s) {
+      s = '';
+    }
+    const goals = goalsAndWinnerForHonorFirst(homeResolved.id, awayResolved.id, f);
+    onChange(match.id, {
+      honorFirstTeamId: f,
+      honorSecondTeamId: s,
+      homeGoals: goals.homeGoals,
+      awayGoals: goals.awayGoals,
+      winnerId: goals.winnerId,
+    });
+  };
 
   return (
     <Card className="gap-0 overflow-hidden border-border/80 bg-gradient-to-br from-background via-background to-emerald-500/5 py-0 shadow-sm">
@@ -113,7 +154,84 @@ export const KnockoutMatchCard = ({
           <TeamSlot team={awayResolved} label="Por definir…" />
         </div>
 
-        {bothResolved ? (
+        {bothResolved && isHonorMatch ? (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {honorLabels.first}
+                </span>
+                <Select
+                  disabled={disabled}
+                  value={honorFirst || UNSET}
+                  onValueChange={(v) => {
+                    if (v === UNSET) return;
+                    const s2 = v === honorSecond ? '' : honorSecond;
+                    applyHonorChange(v, s2);
+                  }}
+                >
+                      <SelectTrigger className="h-9 w-full">
+                        <SelectValue placeholder="Elegir equipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNSET} disabled>
+                          Elegir…
+                        </SelectItem>
+                        <SelectItem value={homeResolved!.id}>
+                          <span className="flex items-center gap-2">
+                            <TeamFlag team={homeResolved!} size="sm" />
+                            {homeResolved!.name}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value={awayResolved!.id}>
+                          <span className="flex items-center gap-2">
+                            <TeamFlag team={awayResolved!} size="sm" />
+                            {awayResolved!.name}
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {honorLabels.second}
+                </span>
+                <Select
+                  disabled={disabled}
+                  value={honorSecond || UNSET}
+                  onValueChange={(v) => {
+                    if (v === UNSET) return;
+                    if (!honorFirst && homeResolved && awayResolved) {
+                      const other = v === homeResolved.id ? awayResolved.id : homeResolved.id;
+                      applyHonorChange(other, v);
+                      return;
+                    }
+                    applyHonorChange(honorFirst, v);
+                  }}
+                >
+                      <SelectTrigger className="h-9 w-full">
+                        <SelectValue placeholder="Elegir equipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNSET} disabled>
+                          Elegir…
+                        </SelectItem>
+                        <SelectItem value={homeResolved!.id}>
+                          <span className="flex items-center gap-2">
+                            <TeamFlag team={homeResolved!} size="sm" />
+                            {homeResolved!.name}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value={awayResolved!.id}>
+                          <span className="flex items-center gap-2">
+                            <TeamFlag team={awayResolved!} size="sm" />
+                            {awayResolved!.name}
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                </Select>
+              </div>
+          </div>
+        ) : bothResolved ? (
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">
               ¿Quién gana?
@@ -150,7 +268,37 @@ export const KnockoutMatchCard = ({
           </div>
         ) : null}
 
-        {winner ? (
+        {bothResolved && isHonorMatch && completedHonorPair(
+          homeResolved!.id,
+          awayResolved!.id,
+          honorFirst,
+          honorSecond,
+        ) ? (
+          <div className="flex flex-col gap-1 border-t border-border/50 pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Trophy className="size-3.5 shrink-0 text-amber-500" aria-hidden />
+              <span className="text-xs text-muted-foreground">
+                {match.matchNumber === 104
+                  ? 'Podio:'
+                  : 'Clasificación:'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 pl-5">
+              <Badge
+                variant="secondary"
+                className="max-w-full truncate bg-emerald-600/15 text-emerald-900 dark:text-emerald-100"
+              >
+                {match.matchNumber === 104 ? '1.º' : '3.º'} — {firstPlaceTeam?.name ?? '—'}
+              </Badge>
+              <Badge
+                variant="secondary"
+                className="max-w-full truncate bg-slate-600/15 text-slate-900 dark:text-slate-100"
+              >
+                {match.matchNumber === 104 ? '2.º' : '4.º'} — {secondTeam?.name ?? '—'}
+              </Badge>
+            </div>
+          </div>
+        ) : winner && !isHonorMatch ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
             <Trophy className="size-3.5 shrink-0 text-amber-500" aria-hidden />
             <span className="text-xs text-muted-foreground">

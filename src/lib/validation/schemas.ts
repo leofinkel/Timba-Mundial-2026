@@ -31,6 +31,8 @@ export const knockoutMatchPredictionSchema = z.object({
   homeGoals: z.number().int().min(0).max(99),
   awayGoals: z.number().int().min(0).max(99),
   winnerId: z.string(),
+  honorFirstTeamId: z.string().optional(),
+  honorSecondTeamId: z.string().optional(),
 });
 
 const specialPredictionNameSchema = z

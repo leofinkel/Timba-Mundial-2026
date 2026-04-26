@@ -10,6 +10,7 @@ import {
   reorderStandingsByTeamOrder,
 } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
+import { honorPairFromWinnerAndOpponent } from '@/lib/knockout/honorMatchPrediction';
 import { resolveR32MatchTeamSlotsFromStandings } from '@/lib/knockout/resolveR32MatchTeamSlots';
 import { KNOCKOUT_ROUNDS } from '@/constants/tournament';
 import type { GroupMatchScoresInput } from '@/lib/fixture/computeGroupStandingsFromPredictions';
@@ -157,13 +158,25 @@ const buildKnockoutStateFromTournament = (
 ): Record<string, KnockoutMatchPrediction> => {
   const state: Record<string, KnockoutMatchPrediction> = {};
   for (const m of matches) {
+    const h = m.homeTeam?.id ?? '';
+    const a = m.awayTeam?.id ?? '';
+    const w = m.winner?.id ?? '';
+    let honorFirstTeamId = '';
+    let honorSecondTeamId = '';
+    if ((m.matchNumber === 103 || m.matchNumber === 104) && h && a && w) {
+      const pair = honorPairFromWinnerAndOpponent(h, a, w);
+      honorFirstTeamId = pair.honorFirstTeamId;
+      honorSecondTeamId = pair.honorSecondTeamId;
+    }
     state[m.id] = {
       matchId: m.id,
-      homeTeamId: m.homeTeam?.id ?? '',
-      awayTeamId: m.awayTeam?.id ?? '',
+      homeTeamId: h,
+      awayTeamId: a,
       homeGoals: m.homeGoals ?? 0,
       awayGoals: m.awayGoals ?? 0,
-      winnerId: m.winner?.id ?? '',
+      winnerId: w,
+      honorFirstTeamId,
+      honorSecondTeamId,
     };
   }
   return state;
@@ -303,7 +316,17 @@ export const useAdminFixtureResults = ({
           ) {
             winnerId = '';
           }
-          next[matchId] = { ...cur, ...teams, winnerId };
+          const ko = tournament.knockoutMatches.find((x) => x.id === matchId);
+          const clearHonor =
+            ko && (ko.matchNumber === 103 || ko.matchNumber === 104);
+          next[matchId] = {
+            ...cur,
+            ...teams,
+            winnerId,
+            ...(clearHonor
+              ? { honorFirstTeamId: '', honorSecondTeamId: '', homeGoals: 0, awayGoals: 0 }
+              : {}),
+          };
         }
       }
 
@@ -391,7 +414,7 @@ export const useAdminFixtureResults = ({
         const updated: KnockoutMatchPrediction = { ...cur, ...patch };
         let next = { ...prev, [matchId]: updated };
 
-        if (patch.winnerId) {
+        if (patch.winnerId != null || patch.honorFirstTeamId != null) {
           next = cascadeWinner(next, matchId);
         }
 
@@ -406,8 +429,12 @@ export const useAdminFixtureResults = ({
       m: KnockoutMatch,
       p: KnockoutMatchPrediction,
     ): { home: number; away: number; override?: string } | null => {
-      if (!p.homeTeamId || !p.awayTeamId || !p.winnerId) return null;
-      if (p.winnerId !== p.homeTeamId && p.winnerId !== p.awayTeamId) return null;
+      const win =
+        (m.matchNumber === 103 || m.matchNumber === 104) && p.honorFirstTeamId
+          ? p.honorFirstTeamId
+          : p.winnerId;
+      if (!p.homeTeamId || !p.awayTeamId || !win) return null;
+      if (win !== p.homeTeamId && win !== p.awayTeamId) return null;
 
       const dbH = m.homeGoals;
       const dbA = m.awayGoals;
@@ -420,7 +447,7 @@ export const useAdminFixtureResults = ({
       }
 
       if (home === 0 && away === 0) {
-        if (p.winnerId === p.homeTeamId) {
+        if (win === p.homeTeamId) {
           home = 1;
           away = 0;
         } else {
@@ -429,21 +456,21 @@ export const useAdminFixtureResults = ({
         }
       } else {
         const implied = naturalWinnerFromScore(home, away, p.homeTeamId, p.awayTeamId);
-        if (implied && implied !== p.winnerId) {
-          if (p.winnerId === p.homeTeamId) {
+        if (implied && implied !== win) {
+          if (win === p.homeTeamId) {
             home = 1;
             away = 0;
           } else {
             home = 0;
             away = 1;
           }
-        } else if (!implied && p.winnerId) {
-          return { home: 1, away: 1, override: p.winnerId };
+        } else if (!implied && win) {
+          return { home: 1, away: 1, override: win };
         }
       }
 
       if (home === away) {
-        return { home, away, override: p.winnerId };
+        return { home, away, override: win };
       }
       return { home, away };
     },
@@ -478,7 +505,11 @@ export const useAdminFixtureResults = ({
       const payload = buildKnockoutSavePayload(m, p);
       if (!payload) continue;
 
-      const sameWinner = m.winner?.id === p.winnerId;
+      const effWin =
+        (m.matchNumber === 103 || m.matchNumber === 104) && p.honorFirstTeamId
+          ? p.honorFirstTeamId
+          : p.winnerId;
+      const sameWinner = m.winner?.id === effWin;
       const sameScores =
         m.homeGoals != null &&
         m.awayGoals != null &&

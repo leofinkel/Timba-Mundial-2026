@@ -3,7 +3,9 @@
 -- si empate, winner_team_id del pronóstico.
 -- Subcampeón: solo si acertó el 2.º puesto y **no** acertó al campeón (no sumar 100
 -- extra cuando el perdedor predicho es el subcampeón al haber acertado campeón).
--- Data: al final se limpian resultados desde 16avos. public.matches no tiene updated_at.
+-- Data: al final se limpian goles y ganador en toda la eliminatoria; además se quitan
+-- home/away en 16avos+ (propagación del bracket), no en 32avos (slots desde grupos).
+-- public.matches no tiene updated_at.
 -- Luego: recargar y ejecutar recalculate_all_scores().
 -- =============================================================================
 
@@ -483,6 +485,20 @@ SET
   home_goals = NULL,
   away_goals = NULL,
   winner_team_id = NULL
+WHERE stage IN (
+  'round-of-32',
+  'round-of-16',
+  'quarter-finals',
+  'semi-finals',
+  'third-place',
+  'final'
+);
+
+-- Sin resultados en cruces anteriores, no deben quedar rivales fijados por Wxx / RUxx.
+UPDATE public.matches
+SET
+  home_team_id = NULL,
+  away_team_id = NULL
 WHERE stage IN (
   'round-of-16',
   'quarter-finals',

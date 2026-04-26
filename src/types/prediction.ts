@@ -20,6 +20,12 @@ export interface KnockoutMatchPrediction {
   homeGoals: number;
   awayGoals: number;
   winnerId: string;
+  /**
+   * Partidos 103 (3.º/4.º) y 104 (final): orden explícito (3.º–4.º y campeón–subcampeón).
+   * Los goles se sincronizan con `honorFirstTeamId` (1.º o 3.º).
+   */
+  honorFirstTeamId?: string;
+  honorSecondTeamId?: string;
 }
 
 export interface SpecialPrediction {

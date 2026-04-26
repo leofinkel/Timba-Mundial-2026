@@ -4,8 +4,10 @@ import { isViewOthersPredictionsWindowOpen, PREDICTION_DEADLINE } from '@/consta
 import type { GroupMatchScoresInput } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import { buildCalculatedStandingsForPrediction } from '@/lib/fixture/buildCalculatedStandingsForPrediction';
 import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
+import { honorPairFromWinnerAndOpponent } from '@/lib/knockout/honorMatchPrediction';
 import { buildPredictionBestThirdQualifierRows } from '@/lib/knockout/buildPredictionBestThirdQualifierRows';
 import { resolvePredictionKnockoutBracket } from '@/lib/knockout/resolvePredictionKnockoutBracket';
+import { predictedWinner } from '@/lib/scoring/computeUserScore';
 import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
@@ -156,8 +158,50 @@ const mapRowsToUserPrediction = async (
       resolvedHomeAway?.home?.trim() || row.pred_home_team_id?.trim() || '';
     const resolvedAwayTeamId =
       resolvedHomeAway?.away?.trim() || row.pred_away_team_id?.trim() || '';
-    const resolvedWinnerId =
+    let resolvedWinnerId =
       resolvedKnockout?.winnerByMatchId.get(m.id) ?? row.winner_team_id ?? '';
+
+    let honorFirstTeamId = '';
+    let honorSecondTeamId = '';
+    if ((m.matchNumber === 103 || m.matchNumber === 104) && resolvedHomeTeamId && resolvedAwayTeamId) {
+      const pw = predictedWinner(
+        {
+          match_id: m.id,
+          home_goals: row.home_goals,
+          away_goals: row.away_goals,
+          winner_team_id: row.winner_team_id,
+        },
+        {
+          home_team_id: resolvedHomeTeamId,
+          away_team_id: resolvedAwayTeamId,
+          home_goals: null,
+          away_goals: null,
+          winner_team_id: null,
+        },
+      );
+      if (pw) {
+        resolvedWinnerId = pw;
+        const pair = honorPairFromWinnerAndOpponent(
+          resolvedHomeTeamId,
+          resolvedAwayTeamId,
+          pw,
+        );
+        honorFirstTeamId = pair.honorFirstTeamId;
+        honorSecondTeamId = pair.honorSecondTeamId;
+      } else {
+        const rw = row.winner_team_id;
+        if (rw && (rw === resolvedHomeTeamId || rw === resolvedAwayTeamId)) {
+          resolvedWinnerId = rw;
+          const pair = honorPairFromWinnerAndOpponent(
+            resolvedHomeTeamId,
+            resolvedAwayTeamId,
+            rw,
+          );
+          honorFirstTeamId = pair.honorFirstTeamId;
+          honorSecondTeamId = pair.honorSecondTeamId;
+        }
+      }
+    }
 
     knockoutPredictions.push({
       matchId: m.id,
@@ -166,6 +210,8 @@ const mapRowsToUserPrediction = async (
       homeGoals: row.home_goals,
       awayGoals: row.away_goals,
       winnerId: resolvedWinnerId,
+      honorFirstTeamId,
+      honorSecondTeamId,
     });
 
     if (
@@ -469,12 +515,23 @@ export const savePredictions = async (
       for (const m of tournament.knockoutMatches) {
         const client = clientKoById.get(m.id);
         const ha = resolved.homeAwayByMatchId.get(m.id);
+        let winnerId = resolved.winnerByMatchId.get(m.id) ?? null;
+        if (
+          (m.matchNumber === 103 || m.matchNumber === 104) &&
+          client?.winnerId &&
+          ha
+        ) {
+          const c = client.winnerId;
+          if (c === ha.home || c === ha.away) {
+            winnerId = c;
+          }
+        }
         await predictionRepository.upsertPredictionMatch(supabase, {
           prediction_id: pred.id,
           match_id: m.id,
           home_goals: client?.homeGoals ?? 0,
           away_goals: client?.awayGoals ?? 0,
-          winner_team_id: resolved.winnerByMatchId.get(m.id) ?? null,
+          winner_team_id: winnerId,
           pred_home_team_id: ha?.home?.trim() ? ha.home : null,
           pred_away_team_id: ha?.away?.trim() ? ha.away : null,
         });
