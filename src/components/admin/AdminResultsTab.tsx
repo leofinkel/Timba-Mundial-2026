@@ -1,7 +1,8 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdminFixtureResultTabs } from '@/components/admin/AdminFixtureResultTabs';
+import { AdminResetOfficialResultsButton } from '@/components/admin/AdminResetOfficialResultsButton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { RealResultsRow } from '@/repositories/realResultsRepository';
 import type { Tournament } from '@/types/tournament';
 
@@ -32,7 +33,8 @@ export const AdminResultsTab = ({
             guardadas.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <AdminResetOfficialResultsButton />
           <AdminFixtureResultTabs
             tournament={tournament}
             teams={teams}

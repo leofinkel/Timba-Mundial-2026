@@ -296,3 +296,65 @@ export const saveSpecialResults = async (
     throw err instanceof Error ? err : new Error('saveSpecialResults failed');
   }
 };
+
+/**
+ * Admin-only: clear all official match results, knockout team assignments (R32+),
+ * special real_results, best-third table and optional group-override rows; then
+ * callers should run `calculateAllScores()`.
+ */
+export const resetAllOfficialResults = async (adminId: string): Promise<void> => {
+  const admin = await isAdmin(adminId);
+  if (!admin) {
+    log.warn({ adminId }, 'resetAllOfficialResults denied');
+    throw new Error('Only admins can reset official results');
+  }
+
+  const supabase = await createServerClient();
+
+  const { error: btpErr } = await supabase
+    .from('best_third_place_qualifiers')
+    .delete()
+    .not('id', 'is', null);
+  if (btpErr) {
+    log.warn({ err: btpErr }, 'reset: best_third_place_qualifiers delete');
+  }
+
+  const { error: rgsErr } = await supabase
+    .from('real_group_standings')
+    .delete()
+    .not('group_id', 'is', null);
+  if (rgsErr) {
+    log.warn({ err: rgsErr }, 'reset: real_group_standings delete');
+  }
+
+  const { error: koErr } = await supabase
+    .from('matches')
+    .update({ home_team_id: null, away_team_id: null })
+    .neq('stage', 'group');
+  if (koErr) {
+    log.error({ err: koErr }, 'reset: knockout team slots clear failed');
+    throw new Error(koErr.message);
+  }
+
+  const { error: resErr } = await supabase
+    .from('matches')
+    .update({
+      home_goals: null,
+      away_goals: null,
+      winner_team_id: null,
+      played_at: null,
+    })
+    .gte('match_number', 1);
+  if (resErr) {
+    log.error({ err: resErr }, 'reset: clear match results failed');
+    throw new Error(resErr.message);
+  }
+
+  const { error: rrErr } = await supabase.from('real_results').delete().not('id', 'is', null);
+  if (rrErr) {
+    log.error({ err: rrErr }, 'reset: real_results delete failed');
+    throw new Error(rrErr.message);
+  }
+
+  log.info({ adminId }, 'All official results and related data cleared');
+};

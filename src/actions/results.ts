@@ -13,6 +13,7 @@ import type { SaveSpecialResultsSchemaInferred } from '@/lib/validation/schemas'
 import { isAdmin } from '@/services/adminService';
 import {
   clearMatchResult,
+  resetAllOfficialResults,
   saveKnockoutWinner,
   saveMatchResult,
   saveSpecialResults,
@@ -183,6 +184,32 @@ export const saveSpecialResultsAction = async (
     revalidatePath('/admin');
     revalidatePath('/dashboard');
     revalidatePath('/rankings');
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const resetAllOfficialResultsAction = async (): Promise<
+  { success: true; data: null } | { success: false; error: string }
+> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const admin = await isAdmin(user.id);
+    if (!admin) return { success: false, error: 'Forbidden' };
+
+    await resetAllOfficialResults(user.id);
+    await calculateAllScores();
+    revalidateAll();
     return { success: true, data: null };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
