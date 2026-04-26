@@ -55,10 +55,14 @@ export const predictedWinner = (p: PredMatch, m: ScoringMatchLike): string | nul
   ) {
     return p.winner_team_id;
   }
+  // No mezclar m.winner_team_id (oficial) con goles de la predicción: si no, con el
+  // partido ya jugado todos "predicen" al campeón real (cuadro de honor a todos).
   return actualWinnerFromMatch({
-    ...m,
+    home_team_id: m.home_team_id,
+    away_team_id: m.away_team_id,
     home_goals: p.home_goals,
     away_goals: p.away_goals,
+    winner_team_id: p.winner_team_id,
   });
 };
 

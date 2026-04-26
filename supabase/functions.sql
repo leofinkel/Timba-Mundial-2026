@@ -159,29 +159,20 @@ COMMENT ON FUNCTION public.get_prediction_group_standings(UUID) IS
 -- SECTION 3: Score Calculation Function
 -- Computes all scoring categories for one user and upserts into user_scores.
 --
+-- Never updates prediction_* rows. User picks are always read from prediction_*;
+-- official data in matches and real_results is only the reference for comparison.
+--
 -- Scoring rules (from game_rules):
 --   Group match winner/draw correct:   1 pt each  (72 group matches)
 --   Exact score bonus:                +5 pts each
 --   Group position correct:            5 pts each  (12 groups x 4 positions)
---   Round of 32 correct winner:       10 pts each  (16 matches)
---   Round of 16 correct winner:       20 pts each  (8 matches)
---   Quarter-finals correct winner:    35 pts each  (4 matches)
---   Semi-finals correct winner:       50 pts each  (2 matches)
---   Finalist correct (in final):     100 pts each  (2 teams)
---   Champion:                        180 pts
---   Runner-up:                       100 pts
---   Third place:                     100 pts
---   Fourth place:                    100 pts
---   Top scorer:                      100 pts
---   Best player:                     100 pts
+--   R32+ qualified teams:              by stage (10 / 20 / 35 / 50 / 100)
+--   Champion / runner-up / 3rd / 4th:  honor from matches 104 / 103 vs prediction
+--   Top scorer / best player:          vs real_results (admin)
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.calculate_user_score(p_user_id UUID)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_prediction_id     UUID;
   v_group_match_pts   INTEGER := 0;
@@ -209,49 +200,28 @@ DECLARE
   v_official_third    TEXT;
   v_official_fourth   TEXT;
 BEGIN
-  SELECT id INTO v_prediction_id
-  FROM public.predictions
-  WHERE user_id = p_user_id;
+  SELECT id INTO v_prediction_id FROM public.predictions WHERE user_id = p_user_id;
+  IF v_prediction_id IS NULL THEN RETURN; END IF;
 
-  IF v_prediction_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  -- =========================================================================
-  -- 1) GROUP MATCH POINTS: winner/draw correct (+1) and exact score (+5)
-  -- =========================================================================
+  -- 1) Group match points + exact score bonus
   SELECT
-    COALESCE(SUM(
-      CASE WHEN (
-        (m.home_goals > m.away_goals AND pm.home_goals > pm.away_goals) OR
-        (m.home_goals < m.away_goals AND pm.home_goals < pm.away_goals) OR
-        (m.home_goals = m.away_goals AND pm.home_goals = pm.away_goals)
-      ) THEN 1 ELSE 0 END
-    ), 0),
-    COALESCE(SUM(
-      CASE WHEN m.home_goals = pm.home_goals
-            AND m.away_goals = pm.away_goals
-      THEN 5 ELSE 0 END
-    ), 0)
+    COALESCE(SUM(CASE WHEN (
+      (m.home_goals > m.away_goals AND pm.home_goals > pm.away_goals) OR
+      (m.home_goals < m.away_goals AND pm.home_goals < pm.away_goals) OR
+      (m.home_goals = m.away_goals AND pm.home_goals = pm.away_goals)
+    ) THEN 1 ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN m.home_goals = pm.home_goals AND m.away_goals = pm.away_goals THEN 5 ELSE 0 END), 0)
   INTO v_group_match_pts, v_exact_result_pts
   FROM public.prediction_matches pm
   JOIN public.matches m ON m.id = pm.match_id
-  WHERE pm.prediction_id = v_prediction_id
-    AND m.stage = 'group'
-    AND m.home_goals IS NOT NULL
-    AND m.away_goals IS NOT NULL;
+  WHERE pm.prediction_id = v_prediction_id AND m.stage = 'group'
+    AND m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL;
 
-  -- =========================================================================
-  -- 2) GROUP POSITION POINTS: 5 pts per team in correct final position
-  --    Uses group_standings and only counts groups with all matches completed.
-  -- =========================================================================
-  SELECT COALESCE(COUNT(*) * 5, 0)::INTEGER
-  INTO v_group_pos_pts
+  -- 2) Group position points: use group_standings only when group is complete
+  SELECT COALESCE(COUNT(*) * 5, 0)::INTEGER INTO v_group_pos_pts
   FROM public.prediction_group_standings pgs
   JOIN public.group_standings gs
-    ON gs.group_id = pgs.group_id
-    AND gs.team_id = pgs.team_id
-    AND gs.position = pgs.position
+    ON gs.group_id = pgs.group_id AND gs.team_id = pgs.team_id AND gs.position = pgs.position
   WHERE pgs.prediction_id = v_prediction_id
     AND NOT EXISTS (
       SELECT 1
@@ -261,194 +231,382 @@ BEGIN
         AND (um.home_goals IS NULL OR um.away_goals IS NULL)
     );
 
-  -- =========================================================================
-  -- 3) KNOCKOUT POINTS: correct advancing team per round
-  --    Compare predicted winner_team_id vs actual winner_team_id per match.
-  -- =========================================================================
-
-  SELECT COALESCE(COUNT(*) * 10, 0)::INTEGER
-  INTO v_r32_pts
-  FROM public.prediction_matches pm
-  JOIN public.matches m ON m.id = pm.match_id
-  WHERE pm.prediction_id = v_prediction_id
-    AND m.stage = 'round-of-32'
-    AND m.winner_team_id IS NOT NULL
-    AND pm.winner_team_id = m.winner_team_id;
-
-  SELECT COALESCE(COUNT(*) * 20, 0)::INTEGER
-  INTO v_r16_pts
-  FROM public.prediction_matches pm
-  JOIN public.matches m ON m.id = pm.match_id
-  WHERE pm.prediction_id = v_prediction_id
-    AND m.stage = 'round-of-16'
-    AND m.winner_team_id IS NOT NULL
-    AND pm.winner_team_id = m.winner_team_id;
-
-  SELECT COALESCE(COUNT(*) * 35, 0)::INTEGER
-  INTO v_qf_pts
-  FROM public.prediction_matches pm
-  JOIN public.matches m ON m.id = pm.match_id
-  WHERE pm.prediction_id = v_prediction_id
-    AND m.stage = 'quarter-finals'
-    AND m.winner_team_id IS NOT NULL
-    AND pm.winner_team_id = m.winner_team_id;
-
-  SELECT COALESCE(COUNT(*) * 50, 0)::INTEGER
-  INTO v_sf_pts
-  FROM public.prediction_matches pm
-  JOIN public.matches m ON m.id = pm.match_id
-  WHERE pm.prediction_id = v_prediction_id
-    AND m.stage = 'semi-finals'
-    AND m.winner_team_id IS NOT NULL
-    AND pm.winner_team_id = m.winner_team_id;
-
-  -- =========================================================================
-  -- 4) FINALIST POINTS: 100 pts per team correctly predicted in the final.
-  --    User's predicted finalists = their semi-final winner picks.
-  --    Actual finalists = teams in the real final match.
-  -- =========================================================================
-  SELECT COALESCE(COUNT(*) * 100, 0)::INTEGER
-  INTO v_finalist_pts
+  -- 3) Knockout points by qualified teams in each stage slots
+  -- Round of 32: 10 points per correctly predicted qualified team.
+  SELECT COALESCE(COUNT(*) * 10, 0)::INTEGER INTO v_r32_pts
   FROM (
-    SELECT pm.winner_team_id AS predicted_finalist
-    FROM public.prediction_matches pm
-    JOIN public.matches m ON m.id = pm.match_id
-    WHERE pm.prediction_id = v_prediction_id
-      AND m.stage = 'semi-finals'
-      AND pm.winner_team_id IS NOT NULL
-  ) pf
-  WHERE pf.predicted_finalist IN (
-    SELECT mf.home_team_id FROM public.matches mf WHERE mf.stage = 'final' AND mf.home_team_id IS NOT NULL
-    UNION
-    SELECT mf.away_team_id FROM public.matches mf WHERE mf.stage = 'final' AND mf.away_team_id IS NOT NULL
+    SELECT DISTINCT team_id
+    FROM (
+      SELECT pm.pred_home_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'round-of-32'
+        AND pm.pred_home_team_id IS NOT NULL
+      UNION ALL
+      SELECT pm.pred_away_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'round-of-32'
+        AND pm.pred_away_team_id IS NOT NULL
+    ) predicted_r32
+  ) p
+  WHERE p.team_id IN (
+    SELECT team_id
+    FROM (
+      SELECT m.home_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'round-of-32'
+        AND m.home_team_id IS NOT NULL
+      UNION ALL
+      SELECT m.away_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'round-of-32'
+        AND m.away_team_id IS NOT NULL
+    ) actual_r32
   );
 
-  -- =========================================================================
-  -- 5) CHAMPION / RUNNER-UP / THIRD / FOURTH from official matches 104 and 103
-  --    Goleador / figura: real_results
-  -- =========================================================================
-  SELECT * INTO v_real FROM public.real_results LIMIT 1;
-  SELECT * INTO v_pred_special
-  FROM public.prediction_specials WHERE prediction_id = v_prediction_id;
+  -- Round of 16: 20 points per correctly predicted qualified team.
+  SELECT COALESCE(COUNT(*) * 20, 0)::INTEGER INTO v_r16_pts
+  FROM (
+    SELECT DISTINCT team_id
+    FROM (
+      SELECT pm.pred_home_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'round-of-16'
+        AND pm.pred_home_team_id IS NOT NULL
+      UNION ALL
+      SELECT pm.pred_away_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'round-of-16'
+        AND pm.pred_away_team_id IS NOT NULL
+    ) predicted_r16
+  ) p
+  WHERE p.team_id IN (
+    SELECT team_id
+    FROM (
+      SELECT m.home_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'round-of-16'
+        AND m.home_team_id IS NOT NULL
+      UNION ALL
+      SELECT m.away_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'round-of-16'
+        AND m.away_team_id IS NOT NULL
+    ) actual_r16
+  );
 
+  -- Quarter-finals: 35 points per correctly predicted qualified team.
+  SELECT COALESCE(COUNT(*) * 35, 0)::INTEGER INTO v_qf_pts
+  FROM (
+    SELECT DISTINCT team_id
+    FROM (
+      SELECT pm.pred_home_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'quarter-finals'
+        AND pm.pred_home_team_id IS NOT NULL
+      UNION ALL
+      SELECT pm.pred_away_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'quarter-finals'
+        AND pm.pred_away_team_id IS NOT NULL
+    ) predicted_qf
+  ) p
+  WHERE p.team_id IN (
+    SELECT team_id
+    FROM (
+      SELECT m.home_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'quarter-finals'
+        AND m.home_team_id IS NOT NULL
+      UNION ALL
+      SELECT m.away_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'quarter-finals'
+        AND m.away_team_id IS NOT NULL
+    ) actual_qf
+  );
+
+  -- Semi-finals: 50 points per correctly predicted qualified team.
+  SELECT COALESCE(COUNT(*) * 50, 0)::INTEGER INTO v_sf_pts
+  FROM (
+    SELECT DISTINCT team_id
+    FROM (
+      SELECT pm.pred_home_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'semi-finals'
+        AND pm.pred_home_team_id IS NOT NULL
+      UNION ALL
+      SELECT pm.pred_away_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'semi-finals'
+        AND pm.pred_away_team_id IS NOT NULL
+    ) predicted_sf
+  ) p
+  WHERE p.team_id IN (
+    SELECT team_id
+    FROM (
+      SELECT m.home_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'semi-finals'
+        AND m.home_team_id IS NOT NULL
+      UNION ALL
+      SELECT m.away_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'semi-finals'
+        AND m.away_team_id IS NOT NULL
+    ) actual_sf
+  );
+
+  -- 4) Finalist points (100 per correctly predicted team in final slots)
+  SELECT COALESCE(COUNT(*) * 100, 0)::INTEGER INTO v_finalist_pts
+  FROM (
+    SELECT DISTINCT team_id
+    FROM (
+      SELECT pm.pred_home_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'final'
+        AND pm.pred_home_team_id IS NOT NULL
+      UNION ALL
+      SELECT pm.pred_away_team_id AS team_id
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND m.stage = 'final'
+        AND pm.pred_away_team_id IS NOT NULL
+    ) predicted_final
+  ) p
+  WHERE p.team_id IN (
+    SELECT team_id
+    FROM (
+      SELECT m.home_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'final'
+        AND m.home_team_id IS NOT NULL
+      UNION ALL
+      SELECT m.away_team_id AS team_id
+      FROM public.matches m
+      WHERE m.stage = 'final'
+        AND m.away_team_id IS NOT NULL
+    ) actual_final
+  );
+
+  -- 5) Honor desde partidos 103 y 104; goleador/figura desde real_results
+  SELECT * INTO v_real FROM public.real_results LIMIT 1;
+  SELECT * INTO v_pred_special FROM public.prediction_specials WHERE prediction_id = v_prediction_id;
+
+  WITH oc AS (
+    SELECT
+      f.home_team_id AS h,
+      f.away_team_id AS a,
+      COALESCE(
+        CASE
+          WHEN f.winner_team_id IN (f.home_team_id, f.away_team_id) THEN f.winner_team_id
+        END,
+        CASE
+          WHEN f.home_goals > f.away_goals THEN f.home_team_id
+          WHEN f.away_goals > f.home_goals THEN f.away_team_id
+          ELSE NULL
+        END
+      ) AS w
+    FROM public.matches f
+    WHERE f.match_number = 104
+      AND f.home_team_id IS NOT NULL
+      AND f.away_team_id IS NOT NULL
+      AND (
+        (f.winner_team_id IS NOT NULL AND f.winner_team_id IN (f.home_team_id, f.away_team_id))
+        OR (f.home_goals IS NOT NULL AND f.away_goals IS NOT NULL)
+      )
+    LIMIT 1
+  )
   SELECT
-    f.winner_team_id,
+    w,
     CASE
-      WHEN f.winner_team_id = f.home_team_id THEN f.away_team_id
-      WHEN f.winner_team_id = f.away_team_id THEN f.home_team_id
+      WHEN w = h THEN a
+      WHEN w = a THEN h
       ELSE NULL
     END
   INTO v_official_champ, v_official_ru
-  FROM public.matches f
-  WHERE f.match_number = 104
-    AND f.home_team_id IS NOT NULL
-    AND f.away_team_id IS NOT NULL
-    AND f.winner_team_id IS NOT NULL
-  LIMIT 1;
+  FROM oc;
 
+  WITH ot AS (
+    SELECT
+      t.home_team_id AS h,
+      t.away_team_id AS a,
+      COALESCE(
+        CASE
+          WHEN t.winner_team_id IN (t.home_team_id, t.away_team_id) THEN t.winner_team_id
+        END,
+        CASE
+          WHEN t.home_goals > t.away_goals THEN t.home_team_id
+          WHEN t.away_goals > t.home_goals THEN t.away_team_id
+          ELSE NULL
+        END
+      ) AS w
+    FROM public.matches t
+    WHERE t.match_number = 103
+      AND t.home_team_id IS NOT NULL
+      AND t.away_team_id IS NOT NULL
+      AND (
+        (t.winner_team_id IS NOT NULL AND t.winner_team_id IN (t.home_team_id, t.away_team_id))
+        OR (t.home_goals IS NOT NULL AND t.away_goals IS NOT NULL)
+      )
+    LIMIT 1
+  )
   SELECT
-    t.winner_team_id,
+    w,
     CASE
-      WHEN t.winner_team_id = t.home_team_id THEN t.away_team_id
-      WHEN t.winner_team_id = t.away_team_id THEN t.home_team_id
+      WHEN w = h THEN a
+      WHEN w = a THEN h
       ELSE NULL
     END
   INTO v_official_third, v_official_fourth
-  FROM public.matches t
-  WHERE t.match_number = 103
-    AND t.home_team_id IS NOT NULL
-    AND t.away_team_id IS NOT NULL
-    AND t.winner_team_id IS NOT NULL
-  LIMIT 1;
+  FROM ot;
 
+  -- Champion: predicted winner of final
   IF v_official_champ IS NOT NULL THEN
-    SELECT pm.winner_team_id INTO v_predicted_champ
+    SELECT COALESCE(
+      CASE
+        WHEN pm.winner_team_id IN (m.home_team_id, m.away_team_id) THEN pm.winner_team_id
+      END,
+      CASE
+        WHEN pm.home_goals > pm.away_goals THEN m.home_team_id
+        WHEN pm.away_goals > pm.home_goals THEN m.away_team_id
+        ELSE NULL
+      END
+    ) INTO v_predicted_champ
     FROM public.prediction_matches pm
     JOIN public.matches m ON m.id = pm.match_id
     WHERE pm.prediction_id = v_prediction_id
       AND (m.match_number = 104 OR m.stage = 'final')
     LIMIT 1;
-
-    IF v_predicted_champ = v_official_champ THEN
-      v_champion_pts := 180;
-    END IF;
+    IF v_predicted_champ = v_official_champ THEN v_champion_pts := 180; END IF;
   END IF;
 
+  -- Runner-up: other predicted finalist
   IF v_official_ru IS NOT NULL THEN
+    WITH pw AS (
+      SELECT COALESCE(
+        CASE
+          WHEN pm.winner_team_id IN (m.home_team_id, m.away_team_id) THEN pm.winner_team_id
+        END,
+        CASE
+          WHEN pm.home_goals > pm.away_goals THEN m.home_team_id
+          WHEN pm.away_goals > pm.home_goals THEN m.away_team_id
+          ELSE NULL
+        END
+      ) AS w,
+        m.home_team_id AS h,
+        m.away_team_id AS a
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND (m.match_number = 104 OR m.stage = 'final')
+      LIMIT 1
+    )
     SELECT
       CASE
-        WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
-        WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+        WHEN w = h THEN a
+        WHEN w = a THEN h
         ELSE NULL
       END INTO v_final_other
-    FROM public.prediction_matches pm
-    JOIN public.matches m ON m.id = pm.match_id
-    WHERE pm.prediction_id = v_prediction_id
-      AND (m.match_number = 104 OR m.stage = 'final')
-    LIMIT 1;
-
+    FROM pw;
     IF v_final_other IS NOT NULL AND v_final_other = v_official_ru THEN
       v_runner_up_pts := 100;
     END IF;
   END IF;
 
+  -- Third: predicted winner of 3rd-place match
   IF v_official_third IS NOT NULL THEN
-    PERFORM 1
-    FROM public.prediction_matches pm
-    JOIN public.matches m ON m.id = pm.match_id
-    WHERE pm.prediction_id = v_prediction_id
-      AND (m.match_number = 103 OR m.stage = 'third-place')
-      AND pm.winner_team_id = v_official_third;
-    IF FOUND THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND (m.match_number = 103 OR m.stage = 'third-place')
+        AND COALESCE(
+          CASE
+            WHEN pm.winner_team_id IN (m.home_team_id, m.away_team_id) THEN pm.winner_team_id
+          END,
+          CASE
+            WHEN pm.home_goals > pm.away_goals THEN m.home_team_id
+            WHEN pm.away_goals > pm.home_goals THEN m.away_team_id
+            ELSE NULL
+          END
+        ) = v_official_third
+    ) THEN
       v_third_pts := 100;
     END IF;
   END IF;
 
+  -- Fourth: predicted loser of 3rd-place match
   IF v_official_fourth IS NOT NULL THEN
+    WITH pw AS (
+      SELECT COALESCE(
+        CASE
+          WHEN pm.winner_team_id IN (m.home_team_id, m.away_team_id) THEN pm.winner_team_id
+        END,
+        CASE
+          WHEN pm.home_goals > pm.away_goals THEN m.home_team_id
+          WHEN pm.away_goals > pm.home_goals THEN m.away_team_id
+          ELSE NULL
+        END
+      ) AS w,
+        m.home_team_id AS h,
+        m.away_team_id AS a
+      FROM public.prediction_matches pm
+      JOIN public.matches m ON m.id = pm.match_id
+      WHERE pm.prediction_id = v_prediction_id
+        AND (m.match_number = 103 OR m.stage = 'third-place')
+      LIMIT 1
+    )
     SELECT
       CASE
-        WHEN pm.winner_team_id = m.home_team_id THEN m.away_team_id
-        WHEN pm.winner_team_id = m.away_team_id THEN m.home_team_id
+        WHEN w = h THEN a
+        WHEN w = a THEN h
         ELSE NULL
       END INTO v_third_loser
-    FROM public.prediction_matches pm
-    JOIN public.matches m ON m.id = pm.match_id
-    WHERE pm.prediction_id = v_prediction_id
-      AND (m.match_number = 103 OR m.stage = 'third-place')
-    LIMIT 1;
-
+    FROM pw;
     IF v_third_loser IS NOT NULL AND v_third_loser = v_official_fourth THEN
       v_fourth_pts := 100;
     END IF;
   END IF;
 
   IF v_real IS NOT NULL THEN
-    -- Top scorer: case-insensitive; trim; collapse internal whitespace (match app normalizer)
-    IF v_real.top_scorer IS NOT NULL
-       AND v_pred_special IS NOT NULL
+    -- Top scorer: case-insensitive; trim; collapse internal whitespace
+    IF v_real.top_scorer IS NOT NULL AND v_pred_special IS NOT NULL
        AND lower(regexp_replace(trim(v_pred_special.top_scorer), '[[:space:]]+', ' ', 'g'))
          = lower(regexp_replace(trim(v_real.top_scorer), '[[:space:]]+', ' ', 'g'))
-    THEN
-      v_scorer_pts := 100;
-    END IF;
+    THEN v_scorer_pts := 100; END IF;
 
-    -- Best player: same rules as top scorer
-    IF v_real.best_player IS NOT NULL
-       AND v_pred_special IS NOT NULL
+    -- Best player: same normalization as top scorer
+    IF v_real.best_player IS NOT NULL AND v_pred_special IS NOT NULL
        AND lower(regexp_replace(trim(v_pred_special.best_player), '[[:space:]]+', ' ', 'g'))
          = lower(regexp_replace(trim(v_real.best_player), '[[:space:]]+', ' ', 'g'))
-    THEN
-      v_player_pts := 100;
-    END IF;
+    THEN v_player_pts := 100; END IF;
   END IF;
 
-  -- =========================================================================
-  -- 6) TOTAL & UPSERT into user_scores
-  -- =========================================================================
+  -- 6) Total & upsert
   v_total := v_group_match_pts + v_exact_result_pts + v_group_pos_pts
-           + v_r32_pts + v_r16_pts + v_qf_pts + v_sf_pts
-           + v_finalist_pts + v_champion_pts + v_runner_up_pts
-           + v_third_pts + v_fourth_pts + v_scorer_pts + v_player_pts;
+           + v_r32_pts + v_r16_pts + v_qf_pts + v_sf_pts + v_finalist_pts
+           + v_champion_pts + v_runner_up_pts + v_third_pts + v_fourth_pts
+           + v_scorer_pts + v_player_pts;
 
   INSERT INTO public.user_scores (
     user_id, group_match_points, exact_result_bonus, group_position_points,
@@ -482,7 +640,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.calculate_user_score(UUID) IS
-  'Computes all scoring categories for one user and upserts into user_scores.';
+  'Read-only w.r.t. predictions: reads prediction_* vs official matches/real_results, upserts only user_scores.';
 
 -- =============================================================================
 -- SECTION 4: Batch score recalculation + ranking

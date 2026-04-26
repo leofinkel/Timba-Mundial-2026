@@ -3,6 +3,10 @@
 -- (winner_team_id si encaja en local/visitante oficiales, si no por goles).
 -- Arregla 4.º (y 3.º) cuando el winner guardado quedó obsoleto vs el partido 103/104.
 -- Oficial: acepta ganador por goles sin winner_team_id en matches.
+--
+-- No modifica filas de prediction_*: solo lee el pronóstico del usuario. Los
+-- goles/resultado en `matches` y los datos en `real_results` son solo el lado
+-- "oficial" para comparar y sumar `user_scores`.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.calculate_user_score(p_user_id UUID)
@@ -474,5 +478,5 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.calculate_user_score(UUID) IS
-  'Computes all scoring categories for one user and upserts into user_scores.';
+  'Read-only w.r.t. predictions: reads prediction_* vs official matches/real_results, upserts only user_scores.';
 

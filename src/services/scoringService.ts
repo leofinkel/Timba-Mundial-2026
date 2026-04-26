@@ -282,6 +282,7 @@ const filterGroupPositionsByCompleteGroups = (
   return out;
 };
 
+/** Compares each user's saved prediction_* to official `matches` / `group_standings` / `real_results`; does not write predictions. */
 const computeForPrediction = (params: {
   userId: string;
   predMatches: PredMatchRow[];
