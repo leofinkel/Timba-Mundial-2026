@@ -417,7 +417,7 @@ export const scoreHonorFromBracket = (
     if (pw) {
       const other =
         pw === finalM.home_team_id ? finalM.away_team_id : finalM.home_team_id;
-      if (other === honor.runner_up_team_id && pw !== honor.champion_team_id) {
+      if (other === honor.runner_up_team_id) {
         runnerUp = SCORING_RULES.honorBoard.runnerUp;
       }
     }

@@ -319,7 +319,7 @@ export const getOtherUserPredictionForViewer = async (
         ok: false,
         code: 'too_early',
         message:
-          'Podrás ver los pronósticos de otros jugadores a partir del 26 de mayo de 2026.',
+          'Podrás ver los pronósticos de otros jugadores a partir del 7 de junio de 2026.',
       };
     }
 

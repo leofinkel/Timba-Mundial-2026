@@ -324,7 +324,7 @@ const computeForPrediction = (params: {
     if (predWin) {
       const other =
         predWin === final.home_team_id ? final.away_team_id : final.home_team_id;
-      if (other === honor.runner_up_team_id && predWin !== honor.champion_team_id) {
+      if (other === honor.runner_up_team_id) {
         b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
       }
     }

@@ -9,6 +9,7 @@ import { createServiceLogger } from '@/lib/logger';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
 import { getTournament } from '@/services/fixtureService';
+import { calculateUserScore } from '@/services/scoringService';
 import type { GroupName } from '@/types/tournament';
 
 const log = createServiceLogger('syncSavedPredictionsBracket');
@@ -172,12 +173,14 @@ export const syncAllSavedPredictionsBracketLogic =
         });
       }
 
-      const { error: rpcErr } = await supabase.rpc('calculate_user_score', {
-        p_user_id: userId,
-      });
-      if (rpcErr) {
+      try {
+        await calculateUserScore(userId);
+      } catch (error) {
         scoreRpcErrors += 1;
-        log.warn({ userId, err: rpcErr.message }, 'calculate_user_score RPC failed');
+        log.warn(
+          { userId, err: error instanceof Error ? error.message : String(error) },
+          'calculateUserScore failed during bracket sync',
+        );
       }
 
       processedPredictions += 1;

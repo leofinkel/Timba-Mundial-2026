@@ -12,14 +12,14 @@ export const TOTAL_MATCHES = 104 as const;
 /** 16 + 8 + 4 + 2 + 1 + 1 (dieciseisavos → final + tercer puesto) */
 export const KNOCKOUT_MATCHES_COUNT = 32 as const;
 
-/** Fin del 25/05/2026 (23:59:59,999) en hora Argentina (UTC−3); límite de envío de la planilla. */
-export const PREDICTION_DEADLINE = '2026-05-25T23:59:59.999-03:00' as const;
+/** Fin del 06/06/2026 (23:59:59,999) en hora Argentina (UTC−3); límite de envío de la planilla. */
+export const PREDICTION_DEADLINE = '2026-06-06T23:59:59.999-03:00' as const;
 
 /**
- * Desde esta fecha/hora (inicio del 26 may 2026, hora Argentina UTC−3) los jugadores
+ * Desde esta fecha/hora (inicio del 07 jun 2026, hora Argentina UTC−3) los jugadores
  * con pago confirmado pueden ver en el ranking los pronósticos de otros usuarios.
  */
-export const VIEW_OTHERS_PREDICTIONS_START_ISO = '2026-05-26T03:00:00.000Z' as const;
+export const VIEW_OTHERS_PREDICTIONS_START_ISO = '2026-06-07T03:00:00.000Z' as const;
 
 export const isViewOthersPredictionsWindowOpen = (now: Date = new Date()): boolean =>
   now.getTime() >= new Date(VIEW_OTHERS_PREDICTIONS_START_ISO).getTime();
