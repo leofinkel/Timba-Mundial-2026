@@ -9,17 +9,17 @@ import { env } from '@/env';
  * Use only for backend operations that must bypass RLS.
  */
 export const createAdminClient = () =>
-  createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        fetch: (url, options) =>
-          fetch(url, { ...options, cache: 'no-store' }),
-      },
+  createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+    global: {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      fetch: (url, options) =>
+        fetch(url, { ...options, cache: 'no-store' }),
+    },
+  });
