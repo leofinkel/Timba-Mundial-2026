@@ -11,4 +11,4 @@ if (prediccion.golesA === real.golesA && prediccion.golesB === real.golesB) {
 puntos += (equiposDieciseisavosAcertados.length * 10);
 puntos += (equiposOctavosAcertados.length * 20);
 // ... y así sucesivamente
-4. Resumen de la Interfaz (Sitemap)VistaContenido PrincipalHome/LoginFormulario de acceso y reglas del juego.DashboardEstado de pago, puntos totales y posición actual.Fixture/CargaAcordeones por Grupo (A-L) + Cuadro de eliminación directa.PosicionesTabla general con todos los amigos participantes.Admin PanelCheckbox de pagos y carga de resultados FIFA.
+4. Resumen de la Interfaz (Sitemap)VistaContenido PrincipalHome/LoginFormulario de acceso y reglas del juego.DashboardEstado de pago, puntos totales y posición actual.Fixture/CargaAcordeones por Grupo (A-L) + Cuadro de eliminación directa.PosicionesTabla general con todos los amigos participantes.Admin PanelCheckbox de pagos y carga de resultados FIFA. Listo
