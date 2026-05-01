@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { differenceInSeconds, format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { differenceInSeconds, parseISO } from 'date-fns';
 import {
   AlertTriangle,
   ArrowRight,
@@ -25,6 +24,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { listPublicNews } from '@/services/newsService';
 import { formatARS } from '@/lib/utils';
 import { getPrizePool, getUserRank } from '@/services/rankingService';
+import {
+  BUENOS_AIRES_TIME_ZONE_LABEL,
+  formatBuenosAiresDateTime,
+} from '@/lib/buenosAiresTime';
 import type { PredictionStatus } from '@/types/prediction';
 
 const deadlineDate = parseISO(PREDICTION_DEADLINE);
@@ -227,7 +230,7 @@ const DashboardPage = async () => {
               Cierre de predicciones
             </CardTitle>
             <CardDescription className="text-zinc-400">
-              {format(deadlineDate, "d 'de' MMMM yyyy, HH:mm 'hs' (zzz)", { locale: es })}
+              {formatBuenosAiresDateTime(deadlineDate)} ({BUENOS_AIRES_TIME_ZONE_LABEL})
             </CardDescription>
           </CardHeader>
           <CardContent>

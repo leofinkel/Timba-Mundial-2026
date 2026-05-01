@@ -1,5 +1,4 @@
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { parseISO } from 'date-fns';
 import { AlertTriangle, Lock } from 'lucide-react';
 
 import { getCurrentUser } from '@/actions/auth';
@@ -10,6 +9,11 @@ import { FixturePredictionTabs } from '@/components/fixture/FixturePredictionTab
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PREDICTION_DEADLINE } from '@/constants/tournament';
+import {
+  BUENOS_AIRES_TIME_ZONE_LABEL,
+  formatBuenosAiresDeadline,
+  formatBuenosAiresDateTime,
+} from '@/lib/buenosAiresTime';
 
 const deadlineDate = parseISO(PREDICTION_DEADLINE);
 
@@ -85,7 +89,7 @@ const FixturePage = async () => {
           </Badge>
         ) : (
           <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
-            Límite: {format(deadlineDate, "d MMM yyyy", { locale: es })}
+            Límite: {formatBuenosAiresDeadline(deadlineDate)} ({BUENOS_AIRES_TIME_ZONE_LABEL})
           </Badge>
         )}
       </div>
@@ -108,7 +112,7 @@ const FixturePage = async () => {
           <CardTitle className="text-lg text-white">Tu planilla</CardTitle>
           <CardDescription className="text-zinc-400">
             {prediction
-              ? `Última actualización: ${format(parseISO(prediction.updatedAt), "d MMM yyyy, HH:mm", { locale: es })}`
+              ? `Última actualización: ${formatBuenosAiresDateTime(parseISO(prediction.updatedAt))} (${BUENOS_AIRES_TIME_ZONE_LABEL})`
               : 'Aún no tenés predicciones guardadas.'}
           </CardDescription>
         </CardHeader>

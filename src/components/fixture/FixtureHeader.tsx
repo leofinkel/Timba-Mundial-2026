@@ -6,6 +6,10 @@ import { Loader2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PREDICTION_DEADLINE } from '@/constants/tournament';
+import {
+  BUENOS_AIRES_TIME_ZONE_LABEL,
+  formatBuenosAiresDateTime,
+} from '@/lib/buenosAiresTime';
 import type { PredictionStatus } from '@/types/prediction';
 
 type FixtureHeaderProps = {
@@ -77,10 +81,7 @@ export const FixtureHeader = ({
           <p className="text-sm text-muted-foreground">
             Cierre de pronósticos:{' '}
             <time dateTime={deadlineIso} className="font-medium text-foreground">
-              {new Date(deadlineIso).toLocaleString('es-AR', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
+              {formatBuenosAiresDateTime(deadlineIso)} ({BUENOS_AIRES_TIME_ZONE_LABEL})
             </time>
           </p>
           <p
