@@ -197,6 +197,35 @@ const scoreKnockoutQualifiedTeams = (
   return out;
 };
 
+const predictedHonorPairFromMatch = (
+  predMatch: PredMatchRow | undefined,
+): { first: string | null; second: string | null } => {
+  if (!predMatch) return { first: null, second: null };
+  const homeTeamId = predMatch.pred_home_team_id;
+  const awayTeamId = predMatch.pred_away_team_id;
+  if (!homeTeamId || !awayTeamId) return { first: null, second: null };
+
+  const winner = predictedWinner(
+    {
+      match_id: predMatch.match_id,
+      home_goals: predMatch.home_goals,
+      away_goals: predMatch.away_goals,
+      winner_team_id: predMatch.winner_team_id,
+    },
+    {
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      home_goals: null,
+      away_goals: null,
+      winner_team_id: null,
+    },
+  );
+
+  if (!winner) return { first: null, second: null };
+  const second = loserInMatch(homeTeamId, awayTeamId, winner);
+  return { first: winner, second };
+};
+
 /** Final 1–4 per group from group_standings; only groups with exactly 4 rows count. */
 const buildFinalGroupPositions = (
   rows: { group_id: string; team_id: string; position: number }[],
@@ -312,38 +341,30 @@ const computeForPrediction = (params: {
   const honor = resolveOfficialHonor(params.matches, params.real);
   const rr = params.real;
 
-  if (finalPred && final && honor.champion_team_id) {
-    const predChamp = predictedWinner(finalPred, final);
-    if (predChamp && predChamp === honor.champion_team_id) {
+  const predictedFinalHonor = predictedHonorPairFromMatch(finalPred);
+  const predictedThirdHonor = predictedHonorPairFromMatch(thirdPred);
+
+  if (honor.champion_team_id && predictedFinalHonor.first) {
+    if (predictedFinalHonor.first === honor.champion_team_id) {
       b.championPoints += SCORING_RULES.honorBoard.champion;
     }
   }
 
-  if (honor.champion_team_id && honor.runner_up_team_id && final && final.home_team_id && final.away_team_id && finalPred) {
-    const predWin = predictedWinner(finalPred, final);
-    if (predWin) {
-      const other =
-        predWin === final.home_team_id ? final.away_team_id : final.home_team_id;
-      if (other === honor.runner_up_team_id) {
-        b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
-      }
+  if (honor.runner_up_team_id && predictedFinalHonor.second) {
+    if (predictedFinalHonor.second === honor.runner_up_team_id) {
+      b.runnerUpPoints += SCORING_RULES.honorBoard.runnerUp;
     }
   }
 
-  if (honor.third_place_team_id && thirdPred && third) {
-    const predThirdW = predictedWinner(thirdPred, third);
-    if (predThirdW && predThirdW === honor.third_place_team_id) {
+  if (honor.third_place_team_id && predictedThirdHonor.first) {
+    if (predictedThirdHonor.first === honor.third_place_team_id) {
       b.thirdPlacePoints += SCORING_RULES.honorBoard.thirdPlace;
     }
   }
 
-  if (honor.fourth_place_team_id && third && third.home_team_id && third.away_team_id && thirdPred) {
-    const predWin = predictedWinner(thirdPred, third);
-    if (predWin) {
-      const predLoser = loserInMatch(third.home_team_id, third.away_team_id, predWin);
-      if (predLoser && predLoser === honor.fourth_place_team_id) {
-        b.fourthPlacePoints += SCORING_RULES.honorBoard.fourthPlace;
-      }
+  if (honor.fourth_place_team_id && predictedThirdHonor.second) {
+    if (predictedThirdHonor.second === honor.fourth_place_team_id) {
+      b.fourthPlacePoints += SCORING_RULES.honorBoard.fourthPlace;
     }
   }
 

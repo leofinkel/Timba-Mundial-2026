@@ -21,6 +21,8 @@ type PredMatch = {
   home_goals: number;
   away_goals: number;
   winner_team_id: string | null;
+  pred_home_team_id?: string | null;
+  pred_away_team_id?: string | null;
 };
 
 /** Campos mínimos para inferir ganador (partidos oficiales o contexto de predicción). */
@@ -398,48 +400,64 @@ export const scoreHonorFromBracket = (
   const predFinal = preds.find((p) => p.match_id === finalM.id);
   const predThird = thirdM?.id ? preds.find((p) => p.match_id === thirdM.id) : undefined;
 
-  const predChamp = predFinal ? predictedWinner(predFinal, finalM) : null;
+  const predictedHonorPair = (
+    pred: PredMatch | undefined,
+    official: MatchRow | undefined,
+  ): { first: string | null; second: string | null } => {
+    if (!pred) return { first: null, second: null };
+    const homeTeamId = pred.pred_home_team_id ?? official?.home_team_id ?? null;
+    const awayTeamId = pred.pred_away_team_id ?? official?.away_team_id ?? null;
+    if (!homeTeamId || !awayTeamId) return { first: null, second: null };
+
+    const first = predictedWinner(pred, {
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      home_goals: null,
+      away_goals: null,
+      winner_team_id: null,
+    });
+    if (!first) return { first: null, second: null };
+    const second = loserInMatch(homeTeamId, awayTeamId, first);
+    return { first, second };
+  };
+
+  const predictedFinal = predictedHonorPair(predFinal, finalM);
+  const predictedThird = predictedHonorPair(predThird, thirdM);
 
   let champion = 0;
-  if (honor.champion_team_id && predChamp && honor.champion_team_id === predChamp) {
+  if (
+    honor.champion_team_id &&
+    predictedFinal.first &&
+    honor.champion_team_id === predictedFinal.first
+  ) {
     champion = SCORING_RULES.honorBoard.champion;
   }
 
   let runnerUp = 0;
   if (
-    honor.champion_team_id &&
     honor.runner_up_team_id &&
-    finalM.home_team_id &&
-    finalM.away_team_id &&
-    predFinal
+    predictedFinal.second &&
+    predictedFinal.second === honor.runner_up_team_id
   ) {
-    const pw = predictedWinner(predFinal, finalM);
-    if (pw) {
-      const other =
-        pw === finalM.home_team_id ? finalM.away_team_id : finalM.home_team_id;
-      if (other === honor.runner_up_team_id) {
-        runnerUp = SCORING_RULES.honorBoard.runnerUp;
-      }
-    }
+    runnerUp = SCORING_RULES.honorBoard.runnerUp;
   }
 
   let third = 0;
-  if (honor.third_place_team_id && thirdM && predThird) {
-    const pt = predictedWinner(predThird, thirdM);
-    if (pt && pt === honor.third_place_team_id) {
-      third = SCORING_RULES.honorBoard.thirdPlace;
-    }
+  if (
+    honor.third_place_team_id &&
+    predictedThird.first &&
+    predictedThird.first === honor.third_place_team_id
+  ) {
+    third = SCORING_RULES.honorBoard.thirdPlace;
   }
 
   let fourth = 0;
-  if (honor.fourth_place_team_id && thirdM && thirdM.home_team_id && thirdM.away_team_id && predThird) {
-    const pw = predictedWinner(predThird, thirdM);
-    if (pw) {
-      const predLoser = loserInMatch(thirdM.home_team_id, thirdM.away_team_id, pw);
-      if (predLoser && predLoser === honor.fourth_place_team_id) {
-        fourth = SCORING_RULES.honorBoard.fourthPlace;
-      }
-    }
+  if (
+    honor.fourth_place_team_id &&
+    predictedThird.second &&
+    predictedThird.second === honor.fourth_place_team_id
+  ) {
+    fourth = SCORING_RULES.honorBoard.fourthPlace;
   }
 
   return { champion, runnerUp, third, fourth };
