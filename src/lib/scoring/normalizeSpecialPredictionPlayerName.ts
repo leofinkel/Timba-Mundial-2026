@@ -1,7 +1,13 @@
 /**
  * Normalizes goleador / figura names for score comparison.
- * Comparisons are case-insensitive; leading/trailing trim; internal runs of
- * whitespace collapse to a single space.
+ * Comparisons are case-insensitive and accent-insensitive; punctuation and
+ * separators are ignored; internal runs of whitespace collapse to a single space.
  */
 export const normalizeSpecialPredictionPlayerName = (s: string): string =>
-  s.trim().toLowerCase().replace(/\s+/g, ' ');
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');

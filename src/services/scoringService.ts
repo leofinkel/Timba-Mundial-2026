@@ -497,6 +497,7 @@ export const calculateAllScores = async (): Promise<{
       .select(
         'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
       )
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -652,6 +653,7 @@ export const calculateUserScore = async (
       .select(
         'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
       )
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 

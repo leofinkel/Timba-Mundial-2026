@@ -45,6 +45,7 @@ const syncHonorBoardRealResults = async (
   const { data: existing, error: exErr } = await supabase
     .from('real_results')
     .select('id')
+    .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (exErr) {
@@ -95,6 +96,7 @@ const clearHonorBoardFieldsForStage = async (
   const { data: existing, error: exErr } = await supabase
     .from('real_results')
     .select('id')
+    .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (exErr || !existing?.id) return;
@@ -380,6 +382,7 @@ export const saveSpecialResults = async (
     const { data: existing, error: exErr } = await supabase
       .from('real_results')
       .select('id')
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
