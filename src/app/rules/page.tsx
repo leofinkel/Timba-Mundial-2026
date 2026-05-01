@@ -116,6 +116,9 @@ const RulesPage = () => {
           <Card className="border-zinc-800 bg-zinc-900/70">
             <CardHeader>
               <CardTitle className="text-base text-white">Estructura de Premios</CardTitle>
+              <p className="text-sm text-zinc-300 sm:text-base">
+                Costo por usuario/planilla es de $20.000
+              </p>
             </CardHeader>
             <CardContent>
               <ul className="grid gap-2 text-sm text-zinc-300 sm:grid-cols-3">
