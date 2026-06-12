@@ -475,11 +475,11 @@ export const calculateAllScores = async (): Promise<{
   try {
     const supabase = createAdminClient();
 
-    const preds = await fetchAllPages<{ id: string; user_id: string }>((from, to) =>
+    const preds = await fetchAllPages<{ id: string; user_id: string }>(async (from, to) =>
       supabase.from('predictions').select('id, user_id').range(from, to),
     );
 
-    const matches = await fetchAllPages<MatchRow>((from, to) =>
+    const matches = await fetchAllPages<MatchRow>(async (from, to) =>
       supabase
         .from('matches')
         .select(
@@ -516,7 +516,7 @@ export const calculateAllScores = async (): Promise<{
       winner_team_id: string | null;
       pred_home_team_id: string | null;
       pred_away_team_id: string | null;
-    }>((from, to) =>
+    }>(async (from, to) =>
       supabase
         .from('prediction_matches')
         .select(
@@ -531,7 +531,7 @@ export const calculateAllScores = async (): Promise<{
       group_id: string;
       team_id: string;
       position: number;
-    }>((from, to) =>
+    }>(async (from, to) =>
       supabase
         .from('prediction_group_standings')
         .select('prediction_id, group_id, team_id, position')
@@ -543,7 +543,7 @@ export const calculateAllScores = async (): Promise<{
       prediction_id: string;
       top_scorer: string;
       best_player: string;
-    }>((from, to) =>
+    }>(async (from, to) =>
       supabase
         .from('prediction_specials')
         .select('prediction_id, top_scorer, best_player')
@@ -589,7 +589,7 @@ export const calculateAllScores = async (): Promise<{
       group_id: string;
       team_id: string;
       position: number;
-    }>((from, to) =>
+    }>(async (from, to) =>
       supabase.from('group_standings').select('group_id, team_id, position').range(from, to),
     );
 
