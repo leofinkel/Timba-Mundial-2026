@@ -658,7 +658,7 @@ BEGIN
   FOR v_user IN
     SELECT DISTINCT p.user_id
     FROM public.predictions p
-    WHERE p.is_locked = true
+    WHERE p.submitted_at IS NOT NULL
   LOOP
     PERFORM public.calculate_user_score(v_user.user_id);
   END LOOP;
@@ -674,7 +674,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.recalculate_all_scores() IS
-  'Recalculates scores for all locked predictions and assigns leaderboard ranks.';
+  'Recalculates scores for all submitted predictions and assigns leaderboard ranks.';
 
 -- =============================================================================
 -- SECTION 5: Knockout Advance Function

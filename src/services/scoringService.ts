@@ -8,7 +8,8 @@ import {
 } from '@/lib/scoring/computeUserScore';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
-import { createServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { fetchAllPages } from '@/lib/supabase/fetchAllPages';
 import type { UserScoreBreakdown } from '@/types/scoring';
 
 const log = createServiceLogger('scoringService');
@@ -409,7 +410,7 @@ const totalFromBreakdown = (b: MutableBreakdown): number =>
   b.bestPlayerPoints;
 
 const persistUserScore = async (
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   b: MutableBreakdown,
 ) => {
@@ -443,9 +444,7 @@ const persistUserScore = async (
   }
 };
 
-const recomputeRanks = async (
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
-) => {
+const recomputeRanks = async (supabase: ReturnType<typeof createAdminClient>) => {
   const { data: rows, error } = await supabase
     .from('user_scores')
     .select('id, total_points')
@@ -474,27 +473,20 @@ export const calculateAllScores = async (): Promise<{
   updatedUsers: number;
 }> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
 
-    const { data: preds, error: pe } = await supabase
-      .from('predictions')
-      .select('id, user_id');
+    const preds = await fetchAllPages<{ id: string; user_id: string }>((from, to) =>
+      supabase.from('predictions').select('id, user_id').range(from, to),
+    );
 
-    if (pe) {
-      log.error({ err: pe }, 'calculateAllScores predictions failed');
-      throw new Error(pe.message);
-    }
-
-    const { data: matches, error: me } = await supabase
-      .from('matches')
-      .select(
-        'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
-      );
-
-    if (me) {
-      log.error({ err: me }, 'calculateAllScores matches failed');
-      throw new Error(me.message);
-    }
+    const matches = await fetchAllPages<MatchRow>((from, to) =>
+      supabase
+        .from('matches')
+        .select(
+          'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
+        )
+        .range(from, to),
+    );
 
     const { data: real, error: re } = await supabase
       .from('real_results')
@@ -510,46 +502,57 @@ export const calculateAllScores = async (): Promise<{
       throw new Error(re.message);
     }
 
-    const predictionIds = (preds ?? []).map((p) => p.id);
+    const predictionIds = preds.map((p) => p.id);
     if (predictionIds.length === 0) {
       log.info('calculateAllScores: no predictions');
       return { updatedUsers: 0 };
     }
 
-    const { data: allPm, error: pme } = await supabase
-      .from('prediction_matches')
-      .select(
-        'prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
-      )
-      .in('prediction_id', predictionIds);
+    const allPm = await fetchAllPages<{
+      prediction_id: string;
+      match_id: string;
+      home_goals: number;
+      away_goals: number;
+      winner_team_id: string | null;
+      pred_home_team_id: string | null;
+      pred_away_team_id: string | null;
+    }>((from, to) =>
+      supabase
+        .from('prediction_matches')
+        .select(
+          'prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
+        )
+        .in('prediction_id', predictionIds)
+        .range(from, to),
+    );
 
-    if (pme) {
-      log.error({ err: pme }, 'calculateAllScores prediction_matches failed');
-      throw new Error(pme.message);
-    }
+    const allGs = await fetchAllPages<{
+      prediction_id: string;
+      group_id: string;
+      team_id: string;
+      position: number;
+    }>((from, to) =>
+      supabase
+        .from('prediction_group_standings')
+        .select('prediction_id, group_id, team_id, position')
+        .in('prediction_id', predictionIds)
+        .range(from, to),
+    );
 
-    const { data: allGs, error: gse } = await supabase
-      .from('prediction_group_standings')
-      .select('prediction_id, group_id, team_id, position')
-      .in('prediction_id', predictionIds);
-
-    if (gse) {
-      log.error({ err: gse }, 'calculateAllScores standings failed');
-      throw new Error(gse.message);
-    }
-
-    const { data: allSp, error: spe } = await supabase
-      .from('prediction_specials')
-      .select('prediction_id, top_scorer, best_player')
-      .in('prediction_id', predictionIds);
-
-    if (spe) {
-      log.error({ err: spe }, 'calculateAllScores specials failed');
-      throw new Error(spe.message);
-    }
+    const allSp = await fetchAllPages<{
+      prediction_id: string;
+      top_scorer: string;
+      best_player: string;
+    }>((from, to) =>
+      supabase
+        .from('prediction_specials')
+        .select('prediction_id, top_scorer, best_player')
+        .in('prediction_id', predictionIds)
+        .range(from, to),
+    );
 
     const pmByPred = new Map<string, PredMatchRow[]>();
-    for (const row of allPm ?? []) {
+    for (const row of allPm) {
       const list = pmByPred.get(row.prediction_id) ?? [];
       list.push({
         match_id: row.match_id,
@@ -563,7 +566,7 @@ export const calculateAllScores = async (): Promise<{
     }
 
     const gsByPred = new Map<string, StandingRow[]>();
-    for (const row of allGs ?? []) {
+    for (const row of allGs) {
       const list = gsByPred.get(row.prediction_id) ?? [];
       list.push({
         group_id: row.group_id,
@@ -574,30 +577,29 @@ export const calculateAllScores = async (): Promise<{
     }
 
     const spByPred = new Map<string, SpecialRow>();
-    for (const row of allSp ?? []) {
+    for (const row of allSp) {
       spByPred.set(row.prediction_id, {
         top_scorer: row.top_scorer,
         best_player: row.best_player,
       });
     }
 
-    const matchRows = (matches ?? []) as MatchRow[];
-    const { data: groupStandingsRows, error: gserr } = await supabase
-      .from('group_standings')
-      .select('group_id, team_id, position');
-
-    if (gserr) {
-      log.error({ err: gserr }, 'calculateAllScores group_standings failed');
-      throw new Error(gserr.message);
-    }
+    const matchRows = matches;
+    const groupStandingsRows = await fetchAllPages<{
+      group_id: string;
+      team_id: string;
+      position: number;
+    }>((from, to) =>
+      supabase.from('group_standings').select('group_id, team_id, position').range(from, to),
+    );
 
     const finalGroupPositions = filterGroupPositionsByCompleteGroups(
-      buildFinalGroupPositions(groupStandingsRows ?? []),
+      buildFinalGroupPositions(groupStandingsRows),
       matchRows,
     );
 
     let updated = 0;
-    for (const p of preds ?? []) {
+    for (const p of preds) {
       const b = computeForPrediction({
         userId: p.user_id,
         predMatches: pmByPred.get(p.id) ?? [],
@@ -625,7 +627,7 @@ export const calculateUserScore = async (
   userId: string,
 ): Promise<UserScoreBreakdown> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
 
     const { data: pred, error: pe } = await supabase
       .from('predictions')
@@ -767,7 +769,7 @@ export const getScoreBreakdown = async (
   userId: string,
 ): Promise<UserScoreBreakdown | null> => {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const { data: row, error } = await supabase
       .from('user_scores')
       .select(
