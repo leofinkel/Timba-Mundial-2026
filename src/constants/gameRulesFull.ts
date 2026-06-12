@@ -22,7 +22,7 @@ export const FINAL_AWARDS_POINTS = [
 ] as const;
 
 export const SAVE_CONDITIONS = [
-  'La fecha límite de guardado es el 25 de mayo de 2026; después se bloquea el formulario.',
+  'La fecha límite de guardado es el 6 de junio de 2026; después se bloquea el formulario.',
   'Goleador del Mundial y Figura del Mundial son campos obligatorios para finalizar el guardado.',
 ] as const;
 

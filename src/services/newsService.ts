@@ -38,8 +38,14 @@ export const listPublicNews = async (limit = 10): Promise<NewsPost[]> => {
 };
 
 export const listAllNewsForAdmin = async (limit = 200): Promise<NewsPost[]> => {
-  const supabase = createAdminClient();
-  return listNewsPosts(supabase, { limit, onlyVisible: false });
+  try {
+    const supabase = createAdminClient();
+    return await listNewsPosts(supabase, { limit, onlyVisible: false });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ err: message }, 'listAllNewsForAdmin failed');
+    return [];
+  }
 };
 
 export const createNewsWithAuth = async (
