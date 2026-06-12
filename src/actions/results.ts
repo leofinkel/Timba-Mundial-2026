@@ -36,6 +36,7 @@ export const saveMatchResultAction = async (
   homeGoals: number,
   awayGoals: number,
   winnerOverride?: string,
+  options?: { recalculateScores?: boolean },
 ): Promise<{ success: true; data: null } | { success: false; error: string }> => {
   try {
     const supabase = await createServerClient();
@@ -65,6 +66,33 @@ export const saveMatchResultAction = async (
       user.id,
       winnerOverride,
     );
+
+    if (options?.recalculateScores !== false) {
+      await calculateAllScores();
+      revalidateAll();
+    }
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const recalculateAllScoresAction = async (): Promise<
+  { success: true; data: null } | { success: false; error: string }
+> => {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const admin = await isAdmin(user.id);
+    if (!admin) return { success: false, error: 'Forbidden' };
 
     await calculateAllScores();
     revalidateAll();

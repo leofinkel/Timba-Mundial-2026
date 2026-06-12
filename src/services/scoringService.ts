@@ -9,7 +9,7 @@ import {
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { createServiceLogger } from '@/lib/logger';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { fetchAllPages } from '@/lib/supabase/fetchAllPages';
+import { getUserScoreByUserId } from '@/repositories/userScoreRepository';
 import type { UserScoreBreakdown } from '@/types/scoring';
 
 const log = createServiceLogger('scoringService');
@@ -469,154 +469,42 @@ const recomputeRanks = async (supabase: ReturnType<typeof createAdminClient>) =>
   }
 };
 
+const countSubmittedPredictions = async (
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<number> => {
+  const { count, error } = await supabase
+    .from('predictions')
+    .select('*', { count: 'exact', head: true })
+    .not('submitted_at', 'is', null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+};
+
+/** Recalculates every submitted prediction via Postgres (source of truth). */
 export const calculateAllScores = async (): Promise<{
   updatedUsers: number;
 }> => {
   try {
     const supabase = createAdminClient();
+    const submittedCount = await countSubmittedPredictions(supabase);
 
-    const preds = await fetchAllPages<{ id: string; user_id: string }>(async (from, to) =>
-      supabase.from('predictions').select('id, user_id').range(from, to),
-    );
-
-    const matches = await fetchAllPages<MatchRow>(async (from, to) =>
-      supabase
-        .from('matches')
-        .select(
-          'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
-        )
-        .range(from, to),
-    );
-
-    const { data: real, error: re } = await supabase
-      .from('real_results')
-      .select(
-        'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
-      )
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (re) {
-      log.error({ err: re }, 'calculateAllScores real_results failed');
-      throw new Error(re.message);
-    }
-
-    const predictionIds = preds.map((p) => p.id);
-    if (predictionIds.length === 0) {
-      log.info('calculateAllScores: no predictions');
+    if (submittedCount === 0) {
+      log.info('calculateAllScores: no submitted predictions');
       return { updatedUsers: 0 };
     }
 
-    const allPm = await fetchAllPages<{
-      prediction_id: string;
-      match_id: string;
-      home_goals: number;
-      away_goals: number;
-      winner_team_id: string | null;
-      pred_home_team_id: string | null;
-      pred_away_team_id: string | null;
-    }>(async (from, to) =>
-      supabase
-        .from('prediction_matches')
-        .select(
-          'prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
-        )
-        .in('prediction_id', predictionIds)
-        .range(from, to),
-    );
-
-    const allGs = await fetchAllPages<{
-      prediction_id: string;
-      group_id: string;
-      team_id: string;
-      position: number;
-    }>(async (from, to) =>
-      supabase
-        .from('prediction_group_standings')
-        .select('prediction_id, group_id, team_id, position')
-        .in('prediction_id', predictionIds)
-        .range(from, to),
-    );
-
-    const allSp = await fetchAllPages<{
-      prediction_id: string;
-      top_scorer: string;
-      best_player: string;
-    }>(async (from, to) =>
-      supabase
-        .from('prediction_specials')
-        .select('prediction_id, top_scorer, best_player')
-        .in('prediction_id', predictionIds)
-        .range(from, to),
-    );
-
-    const pmByPred = new Map<string, PredMatchRow[]>();
-    for (const row of allPm) {
-      const list = pmByPred.get(row.prediction_id) ?? [];
-      list.push({
-        match_id: row.match_id,
-        home_goals: row.home_goals,
-        away_goals: row.away_goals,
-        winner_team_id: row.winner_team_id,
-        pred_home_team_id: row.pred_home_team_id,
-        pred_away_team_id: row.pred_away_team_id,
-      });
-      pmByPred.set(row.prediction_id, list);
+    const { error } = await supabase.rpc('recalculate_all_scores');
+    if (error) {
+      log.error({ err: error }, 'recalculate_all_scores RPC failed');
+      throw new Error(error.message);
     }
 
-    const gsByPred = new Map<string, StandingRow[]>();
-    for (const row of allGs) {
-      const list = gsByPred.get(row.prediction_id) ?? [];
-      list.push({
-        group_id: row.group_id,
-        team_id: row.team_id,
-        position: row.position,
-      });
-      gsByPred.set(row.prediction_id, list);
-    }
-
-    const spByPred = new Map<string, SpecialRow>();
-    for (const row of allSp) {
-      spByPred.set(row.prediction_id, {
-        top_scorer: row.top_scorer,
-        best_player: row.best_player,
-      });
-    }
-
-    const matchRows = matches;
-    const groupStandingsRows = await fetchAllPages<{
-      group_id: string;
-      team_id: string;
-      position: number;
-    }>(async (from, to) =>
-      supabase.from('group_standings').select('group_id, team_id, position').range(from, to),
-    );
-
-    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
-      buildFinalGroupPositions(groupStandingsRows),
-      matchRows,
-    );
-
-    let updated = 0;
-    for (const p of preds) {
-      const b = computeForPrediction({
-        userId: p.user_id,
-        predMatches: pmByPred.get(p.id) ?? [],
-        standings: gsByPred.get(p.id) ?? [],
-        specials: spByPred.get(p.id) ?? null,
-        matches: matchRows,
-        real: (real as RealResultsRow | null) ?? null,
-        finalGroupPositions,
-      });
-
-      await persistUserScore(supabase, p.user_id, b);
-      updated += 1;
-    }
-
-    await recomputeRanks(supabase);
-    log.info({ updatedUsers: updated }, 'calculateAllScores completed');
-    return { updatedUsers: updated };
+    log.info({ updatedUsers: submittedCount }, 'calculateAllScores completed via RPC');
+    return { updatedUsers: submittedCount };
   } catch (err) {
     log.error({ err }, 'calculateAllScores failed');
     throw err instanceof Error ? err : new Error('calculateAllScores failed');
@@ -644,121 +532,24 @@ export const calculateUserScore = async (
       throw new Error('No prediction found for user');
     }
 
-    const { data: matches, error: me } = await supabase
-      .from('matches')
-      .select(
-        'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
-      );
-
-    if (me) {
-      throw new Error(me.message);
-    }
-
-    const { data: real, error: re } = await supabase
-      .from('real_results')
-      .select(
-        'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
-      )
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (re) {
-      throw new Error(re.message);
-    }
-
-    const { data: pm, error: pme } = await supabase
-      .from('prediction_matches')
-      .select(
-        'match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
-      )
-      .eq('prediction_id', pred.id);
-
-    if (pme) {
-      throw new Error(pme.message);
-    }
-
-    const { data: gs, error: gse } = await supabase
-      .from('prediction_group_standings')
-      .select('group_id, team_id, position')
-      .eq('prediction_id', pred.id);
-
-    if (gse) {
-      throw new Error(gse.message);
-    }
-
-    const { data: sp, error: spe } = await supabase
-      .from('prediction_specials')
-      .select('top_scorer, best_player')
-      .eq('prediction_id', pred.id)
-      .maybeSingle();
-
-    if (spe) {
-      throw new Error(spe.message);
-    }
-
-    const matchRows = (matches ?? []) as MatchRow[];
-    const { data: groupStandingsRows, error: gserr } = await supabase
-      .from('group_standings')
-      .select('group_id, team_id, position');
-
-    if (gserr) {
-      throw new Error(gserr.message);
-    }
-
-    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
-      buildFinalGroupPositions(groupStandingsRows ?? []),
-      matchRows,
-    );
-
-    const b = computeForPrediction({
-      userId,
-      predMatches: (pm ?? []) as PredMatchRow[],
-      standings: gs ?? [],
-      specials: sp,
-      matches: matchRows,
-      real: (real as RealResultsRow | null) ?? null,
-      finalGroupPositions,
+    const { error: rpcErr } = await supabase.rpc('calculate_user_score', {
+      p_user_id: userId,
     });
 
-    await persistUserScore(supabase, userId, b);
-    await recomputeRanks(supabase);
-
-    const total = totalFromBreakdown(b);
-    log.info({ userId, total }, 'calculateUserScore completed');
-
-    const { data: row, error: se } = await supabase
-      .from('user_scores')
-      .select(
-        'rank, updated_at, group_match_points, exact_result_bonus, group_position_points, round_of_32_points, round_of_16_points, quarter_final_points, semi_final_points, finalist_points, champion_points, runner_up_points, third_place_points, fourth_place_points, top_scorer_points, best_player_points, total_points',
-      )
-      .eq('user_id', userId)
-      .single();
-
-    if (se || !row) {
-      throw new Error(se?.message ?? 'Failed to reload score row');
+    if (rpcErr) {
+      log.error({ err: rpcErr, userId }, 'calculate_user_score RPC failed');
+      throw new Error(rpcErr.message);
     }
 
-    return {
-      userId,
-      groupMatchPoints: row.group_match_points,
-      exactResultBonus: row.exact_result_bonus,
-      groupPositionPoints: row.group_position_points,
-      roundOf32Points: row.round_of_32_points,
-      roundOf16Points: row.round_of_16_points,
-      quarterFinalPoints: row.quarter_final_points,
-      semiFinalPoints: row.semi_final_points,
-      finalistPoints: row.finalist_points,
-      championPoints: row.champion_points,
-      runnerUpPoints: row.runner_up_points,
-      thirdPlacePoints: row.third_place_points,
-      fourthPlacePoints: row.fourth_place_points,
-      topScorerPoints: row.top_scorer_points,
-      bestPlayerPoints: row.best_player_points,
-      totalPoints: row.total_points,
-      rank: row.rank,
-      updatedAt: row.updated_at,
-    };
+    await recomputeRanks(supabase);
+
+    const row = await getUserScoreByUserId(supabase, userId);
+    if (!row) {
+      throw new Error('Failed to reload score row after RPC');
+    }
+
+    log.info({ userId, total: row.totalPoints }, 'calculateUserScore completed');
+    return row;
   } catch (err) {
     log.error({ err, userId }, 'calculateUserScore failed');
     throw err instanceof Error ? err : new Error('calculateUserScore failed');

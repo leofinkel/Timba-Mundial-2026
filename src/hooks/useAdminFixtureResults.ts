@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
+  recalculateAllScoresAction,
   saveMatchResultAction,
 } from '@/actions/results';
 import {
@@ -490,7 +491,9 @@ export const useAdminFixtureResults = ({
 
         if (m.homeGoals === p.homeGoals && m.awayGoals === p.awayGoals) continue;
 
-        const res = await saveMatchResultAction(m.id, p.homeGoals, p.awayGoals, undefined);
+        const res = await saveMatchResultAction(m.id, p.homeGoals, p.awayGoals, undefined, {
+          recalculateScores: false,
+        });
         if (!res.success) {
           errors.push(`Grupo ${g.id} · ${m.id}: ${res.error}`);
           continue;
@@ -522,12 +525,20 @@ export const useAdminFixtureResults = ({
         payload.home,
         payload.away,
         payload.override,
+        { recalculateScores: false },
       );
       if (!res.success) {
         errors.push(`KO ${m.matchNumber}: ${res.error}`);
         continue;
       }
       saved += 1;
+    }
+
+    if (saved > 0) {
+      const recalc = await recalculateAllScoresAction();
+      if (!recalc.success) {
+        errors.push(`Puntajes: ${recalc.error}`);
+      }
     }
 
     if (errors.length) {

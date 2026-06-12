@@ -950,7 +950,10 @@ CREATE OR REPLACE FUNCTION public.recalculate_all_scores()
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_user RECORD;
 BEGIN
-  FOR v_user IN SELECT DISTINCT p.user_id FROM public.predictions p WHERE p.is_locked = true
+  FOR v_user IN
+    SELECT DISTINCT p.user_id
+    FROM public.predictions p
+    WHERE p.submitted_at IS NOT NULL
   LOOP
     PERFORM public.calculate_user_score(v_user.user_id);
   END LOOP;
