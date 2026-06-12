@@ -88,8 +88,12 @@ const emptyBreakdown = (): MutableBreakdown => ({
   bestPlayerPoints: 0,
 });
 
-const outcomeSide = (hg: number, ag: number): 'home' | 'away' | 'draw' =>
-  hg > ag ? 'home' : hg < ag ? 'away' : 'draw';
+const outcomeSide = (hg: number | string, ag: number | string): 'home' | 'away' | 'draw' => {
+  const h = Number(hg);
+  const a = Number(ag);
+  if (!Number.isFinite(h) || !Number.isFinite(a)) return 'draw';
+  return h > a ? 'home' : h < a ? 'away' : 'draw';
+};
 
 const knockoutBucket = (stage: string): KnockoutBreakdownKey | null => {
   switch (stage) {
@@ -296,8 +300,8 @@ const computeForPrediction = (params: {
         b.groupMatchPoints += SCORING_RULES.groupMatch.correctOutcome;
       }
       if (
-        pm.home_goals === m.home_goals &&
-        pm.away_goals === m.away_goals
+        Number(pm.home_goals) === Number(m.home_goals) &&
+        Number(pm.away_goals) === Number(m.away_goals)
       ) {
         b.exactResultBonus += SCORING_RULES.groupMatch.exactResult;
       }

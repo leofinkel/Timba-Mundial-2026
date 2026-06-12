@@ -34,9 +34,12 @@ export type ScoringMatchLike = {
   winner_team_id: string | null;
 };
 
-const outcome = (h: number, a: number): 'h' | 'a' | 'd' => {
-  if (h > a) return 'h';
-  if (a > h) return 'a';
+const outcome = (h: number | string, a: number | string): 'h' | 'a' | 'd' => {
+  const hh = Number(h);
+  const aa = Number(a);
+  if (!Number.isFinite(hh) || !Number.isFinite(aa)) return 'd';
+  if (hh > aa) return 'h';
+  if (aa > hh) return 'a';
   return 'd';
 };
 
@@ -62,8 +65,9 @@ export const actualWinnerFromMatch = (m: ScoringMatchLike): string | null => {
  */
 export const predictedWinner = (p: PredMatch, m: ScoringMatchLike): string | null => {
   if (!m.home_team_id || !m.away_team_id) return null;
-  const h = p.home_goals;
-  const a = p.away_goals;
+  const h = Number(p.home_goals);
+  const a = Number(p.away_goals);
+  if (!Number.isFinite(h) || !Number.isFinite(a)) return null;
   if (h > a) return m.home_team_id;
   if (a > h) return m.away_team_id;
   if (h === a) {
