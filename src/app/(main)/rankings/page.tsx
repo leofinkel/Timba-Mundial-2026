@@ -24,7 +24,6 @@ const RankingsPage = async () => {
     user ? isAdmin(user.id) : Promise.resolve(false),
   ]);
 
-  const viewerPaid = user?.paymentStatus === 'paid';
   const canViewOthersPredictions = isViewOthersPredictionsWindowOpen();
 
   const { prizePool } = leaderboard;
@@ -99,7 +98,6 @@ const RankingsPage = async () => {
         leaderboard={leaderboard}
         currentUserId={user?.id ?? ''}
         tournament={tournament}
-        viewerPaid={viewerPaid}
         canViewOthersPredictions={canViewOthersPredictions}
         viewerIsAdmin={viewerIsAdmin}
       />

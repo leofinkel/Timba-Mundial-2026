@@ -303,17 +303,6 @@ export const getOtherUserPredictionForViewer = async (
       };
     }
 
-    const supabase = await createServerClient();
-    const paid = await profileRepository.isPaymentPaid(supabase, viewerUserId);
-    if (!paid) {
-      log.warn({ viewerUserId }, 'getOtherUserPredictionForViewer: viewer not paid');
-      return {
-        ok: false,
-        code: 'not_paid',
-        message: 'Solo los jugadores con entrada paga pueden ver pronósticos de otros.',
-      };
-    }
-
     if (!isViewOthersPredictionsWindowOpen()) {
       return {
         ok: false,

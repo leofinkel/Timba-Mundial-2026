@@ -50,7 +50,7 @@ export type UserPredictionView = Omit<UserPrediction, 'predictedGroupStandings'>
   predictedGroupStandings: Partial<Record<GroupName, string[]>>;
 };
 
-export type GetOtherUserPredictionForViewerErrorCode = 'not_paid' | 'too_early' | 'same_user';
+export type GetOtherUserPredictionForViewerErrorCode = 'too_early' | 'same_user';
 
 export type GetOtherUserPredictionForViewerResult =
   | { ok: true; prediction: UserPredictionView | null }

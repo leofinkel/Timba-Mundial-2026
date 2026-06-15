@@ -30,7 +30,6 @@ interface RankingsLeaderboardProps {
   leaderboard: Leaderboard;
   currentUserId: string;
   tournament: Tournament;
-  viewerPaid: boolean;
   canViewOthersPredictions: boolean;
   viewerIsAdmin?: boolean;
 }
@@ -81,7 +80,6 @@ export const RankingsLeaderboard = ({
   leaderboard,
   currentUserId,
   tournament,
-  viewerPaid,
   canViewOthersPredictions,
   viewerIsAdmin = false,
 }: RankingsLeaderboardProps) => {
@@ -92,7 +90,7 @@ export const RankingsLeaderboard = ({
     displayName: string;
   } | null>(null);
 
-  const showNameLinks = viewerIsAdmin || (canViewOthersPredictions && viewerPaid);
+  const showNameLinks = viewerIsAdmin || canViewOthersPredictions;
 
   return (
     <Card className="mx-auto w-full max-w-5xl overflow-hidden border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
