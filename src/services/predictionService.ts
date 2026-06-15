@@ -9,6 +9,7 @@ import { buildPredictionBestThirdQualifierRows } from '@/lib/knockout/buildPredi
 import { resolvePredictionKnockoutBracket } from '@/lib/knockout/resolvePredictionKnockoutBracket';
 import { predictedWinner } from '@/lib/scoring/computeUserScore';
 import { createServiceLogger } from '@/lib/logger';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
 import * as profileRepository from '@/repositories/profileRepository';
@@ -24,6 +25,7 @@ import type {
   UserPredictionView,
 } from '@/types/prediction';
 import type { GroupName } from '@/types/tournament';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type SupabaseServer = Awaited<ReturnType<typeof createServerClient>>;
 
@@ -61,7 +63,7 @@ const toUserPredictionView = (p: UserPrediction): UserPredictionView => ({
 });
 
 const mapRowsToUserPrediction = async (
-  supabase: SupabaseServer,
+  supabase: SupabaseClient | SupabaseServer,
   userId: string,
   pred: predictionRepository.PredictionRow,
 ): Promise<UserPrediction> => {
@@ -323,8 +325,12 @@ export const getOtherUserPredictionForViewer = async (
       };
     }
 
-    const raw = await getUserPrediction(targetUserId);
-    const prediction = raw ? toUserPredictionView(raw) : null;
+    // Use admin client to bypass RLS and read the target user's prediction data.
+    const adminSupabase = createAdminClient();
+    const pred = await predictionRepository.getPredictionByUserId(adminSupabase, targetUserId);
+    const prediction = pred
+      ? toUserPredictionView(await mapRowsToUserPrediction(adminSupabase, targetUserId, pred))
+      : null;
     log.debug(
       { viewerUserId, targetUserId, hasPrediction: !!prediction },
       'getOtherUserPredictionForViewer',

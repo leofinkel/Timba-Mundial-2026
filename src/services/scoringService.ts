@@ -7,6 +7,7 @@ import {
   loserInMatch,
 } from '@/lib/scoring/computeUserScore';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
+import { fetchAllPages } from '@/lib/supabase/fetchAllPages';
 import { createServiceLogger } from '@/lib/logger';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserScoreByUserId } from '@/repositories/userScoreRepository';
@@ -469,51 +470,151 @@ const recomputeRanks = async (supabase: ReturnType<typeof createAdminClient>) =>
   }
 };
 
-const countSubmittedPredictions = async (
-  supabase: ReturnType<typeof createAdminClient>,
-): Promise<number> => {
-  const { count, error } = await supabase
-    .from('predictions')
-    .select('*', { count: 'exact', head: true })
-    .not('submitted_at', 'is', null);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return count ?? 0;
-};
-
-/** Recalculates every submitted prediction via Postgres (source of truth). */
-export const calculateAllScores = async (): Promise<{
-  updatedUsers: number;
-}> => {
+/** Recalculates every submitted prediction in TypeScript — no Postgres RPC needed. */
+export const calculateAllScores = async (): Promise<{ updatedUsers: number }> => {
   try {
     const supabase = createAdminClient();
-    const submittedCount = await countSubmittedPredictions(supabase);
 
-    if (submittedCount === 0) {
+    // Load shared data in parallel (one round-trip per table)
+    const [matchesRes, realRes, groupStandingsRes, predsRes] = await Promise.all([
+      supabase
+        .from('matches')
+        .select(
+          'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
+        )
+        .order('match_number', { ascending: true }),
+      supabase
+        .from('real_results')
+        .select(
+          'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
+        )
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase.from('group_standings').select('group_id, team_id, position'),
+      supabase
+        .from('predictions')
+        .select('id, user_id')
+        .not('submitted_at', 'is', null),
+    ]);
+
+    if (matchesRes.error) throw new Error(matchesRes.error.message);
+    if (realRes.error) throw new Error(realRes.error.message);
+    if (groupStandingsRes.error) throw new Error(groupStandingsRes.error.message);
+    if (predsRes.error) throw new Error(predsRes.error.message);
+
+    const submittedPreds = predsRes.data ?? [];
+    if (submittedPreds.length === 0) {
       log.info('calculateAllScores: no submitted predictions');
       return { updatedUsers: 0 };
     }
 
-    const { error } = await supabase.rpc('recalculate_all_scores');
-    if (error) {
-      log.error({ err: error }, 'recalculate_all_scores RPC failed');
-      throw new Error(error.message);
+    const predIds = submittedPreds.map((p) => p.id);
+
+    // Bulk load all prediction data for every submitted prediction in parallel.
+    // fetchAllPages handles the PostgREST row limit for large leagues.
+    type RawPredMatch = {
+      prediction_id: string;
+      match_id: string;
+      home_goals: number;
+      away_goals: number;
+      winner_team_id: string | null;
+      pred_home_team_id: string | null;
+      pred_away_team_id: string | null;
+    };
+    type RawPredStanding = { prediction_id: string; group_id: string; team_id: string; position: number };
+    type RawPredSpecial = { prediction_id: string; top_scorer: string; best_player: string };
+
+    const [allPredMatches, allPredStandings, allPredSpecials] = await Promise.all([
+      fetchAllPages<RawPredMatch>(async (from, to) =>
+        supabase
+          .from('prediction_matches')
+          .select(
+            'prediction_id, match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
+          )
+          .in('prediction_id', predIds)
+          .range(from, to),
+      ),
+      fetchAllPages<RawPredStanding>(async (from, to) =>
+        supabase
+          .from('prediction_group_standings')
+          .select('prediction_id, group_id, team_id, position')
+          .in('prediction_id', predIds)
+          .range(from, to),
+      ),
+      fetchAllPages<RawPredSpecial>(async (from, to) =>
+        supabase
+          .from('prediction_specials')
+          .select('prediction_id, top_scorer, best_player')
+          .in('prediction_id', predIds)
+          .range(from, to),
+      ),
+    ]);
+
+    // Build in-memory lookup maps by prediction_id
+    const predMatchesByPredId = new Map<string, PredMatchRow[]>();
+    for (const row of allPredMatches) {
+      const arr = predMatchesByPredId.get(row.prediction_id) ?? [];
+      arr.push({
+        match_id: row.match_id,
+        home_goals: row.home_goals,
+        away_goals: row.away_goals,
+        winner_team_id: row.winner_team_id,
+        pred_home_team_id: row.pred_home_team_id,
+        pred_away_team_id: row.pred_away_team_id,
+      });
+      predMatchesByPredId.set(row.prediction_id, arr);
     }
 
-    log.info({ updatedUsers: submittedCount }, 'calculateAllScores completed via RPC');
-    return { updatedUsers: submittedCount };
+    const predStandingsByPredId = new Map<string, StandingRow[]>();
+    for (const row of allPredStandings) {
+      const arr = predStandingsByPredId.get(row.prediction_id) ?? [];
+      arr.push({ group_id: row.group_id, team_id: row.team_id, position: row.position });
+      predStandingsByPredId.set(row.prediction_id, arr);
+    }
+
+    const predSpecialsByPredId = new Map<string, SpecialRow>();
+    for (const row of allPredSpecials) {
+      predSpecialsByPredId.set(row.prediction_id, {
+        top_scorer: row.top_scorer,
+        best_player: row.best_player,
+      });
+    }
+
+    // Build official group positions from the real standings table
+    const allGroupPositions = buildFinalGroupPositions(
+      (groupStandingsRes.data ?? []) as StandingRow[],
+    );
+    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
+      allGroupPositions,
+      (matchesRes.data ?? []) as MatchRow[],
+    );
+
+    // Compute and persist a score for every submitted prediction
+    for (const pred of submittedPreds) {
+      const b = computeForPrediction({
+        userId: pred.user_id,
+        predMatches: predMatchesByPredId.get(pred.id) ?? [],
+        standings: predStandingsByPredId.get(pred.id) ?? [],
+        specials: predSpecialsByPredId.get(pred.id) ?? null,
+        matches: (matchesRes.data ?? []) as MatchRow[],
+        real: (realRes.data as RealResultsRow | null) ?? null,
+        finalGroupPositions,
+      });
+      await persistUserScore(supabase, pred.user_id, b);
+    }
+
+    await recomputeRanks(supabase);
+
+    log.info({ updatedUsers: submittedPreds.length }, 'calculateAllScores completed');
+    return { updatedUsers: submittedPreds.length };
   } catch (err) {
     log.error({ err }, 'calculateAllScores failed');
     throw err instanceof Error ? err : new Error('calculateAllScores failed');
   }
 };
 
-export const calculateUserScore = async (
-  userId: string,
-): Promise<UserScoreBreakdown> => {
+export const calculateUserScore = async (userId: string): Promise<UserScoreBreakdown> => {
   try {
     const supabase = createAdminClient();
 
@@ -527,26 +628,73 @@ export const calculateUserScore = async (
       log.error({ err: pe, userId }, 'calculateUserScore prediction query failed');
       throw new Error(pe.message);
     }
+    if (!pred) throw new Error('No prediction found for user');
 
-    if (!pred) {
-      throw new Error('No prediction found for user');
-    }
+    // Load everything needed to score this user in parallel
+    const [matchesRes, realRes, groupStandingsRes, predMatchesRes, predStandingsRes, predSpecialsRes] =
+      await Promise.all([
+        supabase
+          .from('matches')
+          .select(
+            'id, match_number, stage, group_id, home_team_id, away_team_id, home_goals, away_goals, winner_team_id',
+          )
+          .order('match_number', { ascending: true }),
+        supabase
+          .from('real_results')
+          .select(
+            'top_scorer, best_player, champion_team_id, runner_up_team_id, third_place_team_id, fourth_place_team_id',
+          )
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase.from('group_standings').select('group_id, team_id, position'),
+        supabase
+          .from('prediction_matches')
+          .select(
+            'match_id, home_goals, away_goals, winner_team_id, pred_home_team_id, pred_away_team_id',
+          )
+          .eq('prediction_id', pred.id),
+        supabase
+          .from('prediction_group_standings')
+          .select('group_id, team_id, position')
+          .eq('prediction_id', pred.id),
+        supabase
+          .from('prediction_specials')
+          .select('top_scorer, best_player')
+          .eq('prediction_id', pred.id)
+          .maybeSingle(),
+      ]);
 
-    const { error: rpcErr } = await supabase.rpc('calculate_user_score', {
-      p_user_id: userId,
+    if (matchesRes.error) throw new Error(matchesRes.error.message);
+    if (realRes.error) throw new Error(realRes.error.message);
+    if (groupStandingsRes.error) throw new Error(groupStandingsRes.error.message);
+    if (predMatchesRes.error) throw new Error(predMatchesRes.error.message);
+    if (predStandingsRes.error) throw new Error(predStandingsRes.error.message);
+    if (predSpecialsRes.error) throw new Error(predSpecialsRes.error.message);
+
+    const allGroupPositions = buildFinalGroupPositions(
+      (groupStandingsRes.data ?? []) as StandingRow[],
+    );
+    const finalGroupPositions = filterGroupPositionsByCompleteGroups(
+      allGroupPositions,
+      (matchesRes.data ?? []) as MatchRow[],
+    );
+
+    const b = computeForPrediction({
+      userId,
+      predMatches: (predMatchesRes.data ?? []) as PredMatchRow[],
+      standings: (predStandingsRes.data ?? []) as StandingRow[],
+      specials: (predSpecialsRes.data as SpecialRow | null) ?? null,
+      matches: (matchesRes.data ?? []) as MatchRow[],
+      real: (realRes.data as RealResultsRow | null) ?? null,
+      finalGroupPositions,
     });
 
-    if (rpcErr) {
-      log.error({ err: rpcErr, userId }, 'calculate_user_score RPC failed');
-      throw new Error(rpcErr.message);
-    }
-
+    await persistUserScore(supabase, userId, b);
     await recomputeRanks(supabase);
 
     const row = await getUserScoreByUserId(supabase, userId);
-    if (!row) {
-      throw new Error('Failed to reload score row after RPC');
-    }
+    if (!row) throw new Error('Failed to reload score row after computation');
 
     log.info({ userId, total: row.totalPoints }, 'calculateUserScore completed');
     return row;
