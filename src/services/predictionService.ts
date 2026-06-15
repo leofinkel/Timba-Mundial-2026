@@ -312,19 +312,19 @@ export const getOtherUserPredictionForViewer = async (
       };
     }
 
-    // Use admin client to bypass RLS — regular users can't read other users' prediction rows.
-    // We build the view directly from raw tables (read-only, no healing writes).
-    const adminSupabase = createAdminClient();
-    const pred = await predictionRepository.getPredictionByUserId(adminSupabase, targetUserId);
+    // Use the viewer's own session — RLS now allows all authenticated users to SELECT
+    // prediction rows after the viewing window opens (see predictions_select_all_authenticated policy).
+    const supabase = await createServerClient();
+    const pred = await predictionRepository.getPredictionByUserId(supabase, targetUserId);
 
     if (!pred) {
       return { ok: true, prediction: null };
     }
 
     const [joined, standingRows, specials] = await Promise.all([
-      predictionRepository.listPredictionMatchesWithMatches(adminSupabase, pred.id),
-      predictionRepository.listGroupStandingsRows(adminSupabase, pred.id),
-      predictionRepository.getPredictionSpecials(adminSupabase, pred.id),
+      predictionRepository.listPredictionMatchesWithMatches(supabase, pred.id),
+      predictionRepository.listGroupStandingsRows(supabase, pred.id),
+      predictionRepository.getPredictionSpecials(supabase, pred.id),
     ]);
 
     const groupPredictions: GroupMatchPrediction[] = [];

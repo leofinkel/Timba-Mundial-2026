@@ -321,13 +321,17 @@ CREATE POLICY "matches_select_public" ON public.matches FOR SELECT USING (true);
 CREATE POLICY "matches_write_admin" ON public.matches FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 CREATE POLICY "predictions_select_own_or_admin" ON public.predictions FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY "predictions_select_all_authenticated" ON public.predictions FOR SELECT TO authenticated USING (true);
 CREATE POLICY "predictions_insert_own_or_admin" ON public.predictions FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() OR public.is_admin());
 CREATE POLICY "predictions_update_own_or_admin" ON public.predictions FOR UPDATE TO authenticated USING (user_id = auth.uid() OR public.is_admin()) WITH CHECK (user_id = auth.uid() OR public.is_admin());
 CREATE POLICY "predictions_delete_own_or_admin" ON public.predictions FOR DELETE TO authenticated USING (user_id = auth.uid() OR public.is_admin());
 
 CREATE POLICY "prediction_matches_own_or_admin" ON public.prediction_matches FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
+CREATE POLICY "prediction_matches_select_all_authenticated" ON public.prediction_matches FOR SELECT TO authenticated USING (true);
 CREATE POLICY "prediction_group_standings_own_or_admin" ON public.prediction_group_standings FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
+CREATE POLICY "prediction_group_standings_select_all_authenticated" ON public.prediction_group_standings FOR SELECT TO authenticated USING (true);
 CREATE POLICY "prediction_specials_own_or_admin" ON public.prediction_specials FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
+CREATE POLICY "prediction_specials_select_all_authenticated" ON public.prediction_specials FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "prediction_best_third_own_or_admin" ON public.prediction_best_third_place_qualifiers FOR ALL TO authenticated USING (public.owns_prediction(prediction_id) OR public.is_admin()) WITH CHECK (public.owns_prediction(prediction_id) OR public.is_admin());
 
