@@ -9,6 +9,7 @@ import { buildPredictionBestThirdQualifierRows } from '@/lib/knockout/buildPredi
 import { resolvePredictionKnockoutBracket } from '@/lib/knockout/resolvePredictionKnockoutBracket';
 import { predictedWinner } from '@/lib/scoring/computeUserScore';
 import { createServiceLogger } from '@/lib/logger';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerClient } from '@/lib/supabase/server';
 import * as predictionRepository from '@/repositories/predictionRepository';
 import * as profileRepository from '@/repositories/profileRepository';
@@ -322,10 +323,63 @@ export const getOtherUserPredictionForViewer = async (
       };
     }
 
-    const raw = await getUserPrediction(targetUserId);
-    const prediction = raw ? toUserPredictionView(raw) : null;
+    // Use admin client to bypass RLS — regular users can't read other users' prediction rows.
+    // We build the view directly from raw tables (read-only, no healing writes).
+    const adminSupabase = createAdminClient();
+    const pred = await predictionRepository.getPredictionByUserId(adminSupabase, targetUserId);
+
+    if (!pred) {
+      return { ok: true, prediction: null };
+    }
+
+    const [joined, standingRows, specials] = await Promise.all([
+      predictionRepository.listPredictionMatchesWithMatches(adminSupabase, pred.id),
+      predictionRepository.listGroupStandingsRows(adminSupabase, pred.id),
+      predictionRepository.getPredictionSpecials(adminSupabase, pred.id),
+    ]);
+
+    const groupPredictions: GroupMatchPrediction[] = [];
+    const knockoutPredictions: KnockoutMatchPrediction[] = [];
+
+    for (const row of joined) {
+      if (!row.matches) continue;
+      if (row.matches.stage === 'group') {
+        groupPredictions.push({
+          matchId: row.match_id,
+          homeGoals: row.home_goals,
+          awayGoals: row.away_goals,
+        });
+      } else {
+        knockoutPredictions.push({
+          matchId: row.match_id,
+          homeTeamId: row.pred_home_team_id ?? '',
+          awayTeamId: row.pred_away_team_id ?? '',
+          homeGoals: row.home_goals,
+          awayGoals: row.away_goals,
+          winnerId: row.winner_team_id ?? '',
+        });
+      }
+    }
+
+    const prediction: UserPredictionView = {
+      id: pred.id,
+      userId: targetUserId,
+      groupPredictions,
+      knockoutPredictions,
+      specialPredictions: {
+        topScorer: specials?.top_scorer ?? '',
+        bestPlayer: specials?.best_player ?? '',
+      },
+      predictedGroupStandings: Object.fromEntries(
+        buildStandingsMap(standingRows),
+      ) as UserPredictionView['predictedGroupStandings'],
+      isLocked: pred.is_locked,
+      submittedAt: pred.submitted_at,
+      updatedAt: pred.updated_at,
+    };
+
     log.debug(
-      { viewerUserId, targetUserId, hasPrediction: !!prediction },
+      { viewerUserId, targetUserId, hasPrediction: true },
       'getOtherUserPredictionForViewer',
     );
     return { ok: true, prediction };
