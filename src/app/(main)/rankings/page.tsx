@@ -12,15 +12,18 @@ import { isViewOthersPredictionsWindowOpen } from '@/constants/tournament';
 import { formatARS } from '@/lib/utils';
 import { getTournament } from '@/services/fixtureService';
 import { getLeaderboard } from '@/services/rankingService';
+import { isAdmin } from '@/services/adminService';
 
 const RankingsPage = async () => {
-  const [userResult, leaderboard, tournament] = await Promise.all([
-    getCurrentUser(),
+  const userResult = await getCurrentUser();
+  const user = userResult.success ? userResult.data : null;
+
+  const [leaderboard, tournament, viewerIsAdmin] = await Promise.all([
     getLeaderboard(),
     getTournament(),
+    user ? isAdmin(user.id) : Promise.resolve(false),
   ]);
 
-  const user = userResult.success ? userResult.data : null;
   const viewerPaid = user?.paymentStatus === 'paid';
   const canViewOthersPredictions = isViewOthersPredictionsWindowOpen();
 
@@ -98,6 +101,7 @@ const RankingsPage = async () => {
         tournament={tournament}
         viewerPaid={viewerPaid}
         canViewOthersPredictions={canViewOthersPredictions}
+        viewerIsAdmin={viewerIsAdmin}
       />
     </div>
   );

@@ -32,6 +32,7 @@ interface RankingsLeaderboardProps {
   tournament: Tournament;
   viewerPaid: boolean;
   canViewOthersPredictions: boolean;
+  viewerIsAdmin?: boolean;
 }
 
 type BreakdownPointsKey = {
@@ -82,6 +83,7 @@ export const RankingsLeaderboard = ({
   tournament,
   viewerPaid,
   canViewOthersPredictions,
+  viewerIsAdmin = false,
 }: RankingsLeaderboardProps) => {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
   const [predictionDialogOpen, setPredictionDialogOpen] = useState(false);
@@ -90,7 +92,7 @@ export const RankingsLeaderboard = ({
     displayName: string;
   } | null>(null);
 
-  const showNameLinks = canViewOthersPredictions && viewerPaid;
+  const showNameLinks = viewerIsAdmin || (canViewOthersPredictions && viewerPaid);
 
   return (
     <Card className="mx-auto w-full max-w-5xl overflow-hidden border-zinc-800/80 bg-zinc-900/50 shadow-md backdrop-blur-sm">
@@ -246,6 +248,7 @@ export const RankingsLeaderboard = ({
         targetUserId={predictionTarget?.id ?? null}
         targetDisplayName={predictionTarget?.displayName ?? ''}
         tournament={tournament}
+        fetchSource={viewerIsAdmin ? 'admin' : 'ranking'}
       />
     </Card>
   );
