@@ -8,6 +8,7 @@ export type PredictionRow = {
   id: string;
   user_id: string;
   is_locked: boolean;
+  admin_unlocked: boolean;
   submitted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -91,6 +92,7 @@ export const lockPredictionRow = async (
     .from('predictions')
     .update({
       is_locked: true,
+      admin_unlocked: false,
       submitted_at: new Date().toISOString(),
     })
     .eq('id', predictionId)
@@ -98,6 +100,21 @@ export const lockPredictionRow = async (
     .single();
 
   if (error) throw new Error(`predictions.lock failed: ${error.message}`);
+  return data as PredictionRow;
+};
+
+export const unlockPredictionRow = async (
+  supabase: SupabaseClient,
+  predictionId: string,
+): Promise<PredictionRow> => {
+  const { data, error } = await supabase
+    .from('predictions')
+    .update({ is_locked: false, admin_unlocked: true })
+    .eq('id', predictionId)
+    .select('*')
+    .single();
+
+  if (error) throw new Error(`predictions.unlock failed: ${error.message}`);
   return data as PredictionRow;
 };
 
@@ -129,6 +146,8 @@ type ProfileSnippet = {
 
 type SubmittedPredictionProfileRow = {
   user_id: string;
+  is_locked: boolean;
+  admin_unlocked: boolean;
   submitted_at: string;
   updated_at: string;
   profiles: ProfileSnippet | ProfileSnippet[] | null;
@@ -142,13 +161,15 @@ export const listSubmittedPredictionsWithProfilesForAdmin = async (
     displayName: string;
     email: string;
     avatarUrl: string | null;
+    isLocked: boolean;
+    adminUnlocked: boolean;
     submittedAt: string;
     updatedAt: string;
   }>
 > => {
   const { data, error } = await supabase
     .from('predictions')
-    .select('user_id, submitted_at, updated_at, profiles(display_name, email, avatar_url)')
+    .select('user_id, is_locked, admin_unlocked, submitted_at, updated_at, profiles(display_name, email, avatar_url)')
     .not('submitted_at', 'is', null)
     .order('submitted_at', { ascending: false });
 
@@ -163,6 +184,8 @@ export const listSubmittedPredictionsWithProfilesForAdmin = async (
       displayName: prof?.display_name ?? '—',
       email: prof?.email ?? '—',
       avatarUrl: prof?.avatar_url ?? null,
+      isLocked: row.is_locked,
+      adminUnlocked: row.admin_unlocked,
       submittedAt: row.submitted_at,
       updatedAt: row.updated_at,
     };

@@ -265,6 +265,7 @@ const mapRowsToUserPrediction = async (
     },
     predictedGroupStandings: standingsMap,
     isLocked: pred.is_locked,
+    adminUnlocked: pred.admin_unlocked,
     submittedAt: pred.submitted_at,
     updatedAt: pred.updated_at,
   };
@@ -443,17 +444,17 @@ export const savePredictions = async (
       return { success: false, error: 'User must be marked as paid' };
     }
 
-    if (deadlinePassed()) {
-      log.warn({ userId }, 'savePredictions: deadline passed');
-      return { success: false, error: 'Prediction deadline has passed' };
-    }
-
     const existing = await predictionRepository.getPredictionByUserId(
       supabase,
       userId,
     );
     if (existing?.is_locked) {
       return { success: false, error: 'Prediction is locked' };
+    }
+
+    if (deadlinePassed() && !existing?.admin_unlocked) {
+      log.warn({ userId }, 'savePredictions: deadline passed');
+      return { success: false, error: 'Prediction deadline has passed' };
     }
 
     const pred = await predictionRepository.upsertPredictionRow(supabase, userId);
@@ -625,14 +626,14 @@ export const saveSpecialPredictions = async (
       return { success: false, error: 'User must be marked as paid' };
     }
 
-    if (deadlinePassed()) {
-      log.warn({ userId }, 'saveSpecialPredictions: deadline passed');
-      return { success: false, error: 'Prediction deadline has passed' };
-    }
-
     const existing = await predictionRepository.getPredictionByUserId(supabase, userId);
     if (existing?.is_locked) {
       return { success: false, error: 'Prediction is locked' };
+    }
+
+    if (deadlinePassed() && !existing?.admin_unlocked) {
+      log.warn({ userId }, 'saveSpecialPredictions: deadline passed');
+      return { success: false, error: 'Prediction deadline has passed' };
     }
 
     const pred = await predictionRepository.upsertPredictionRow(supabase, userId);
@@ -670,11 +671,56 @@ export const canUserSubmit = async (userId: string): Promise<boolean> => {
     const paid = await profileRepository.isPaymentPaid(supabase, userId);
     const pred = await predictionRepository.getPredictionByUserId(supabase, userId);
     if (pred?.is_locked) return false;
-    return paid && !deadlinePassed();
+    if (deadlinePassed() && !pred?.admin_unlocked) return false;
+    return paid;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     log.error({ userId, err: message }, 'canUserSubmit failed');
     throw new Error(`canUserSubmit failed: ${message}`);
+  }
+};
+
+export const unlockPredictionForAdmin = async (
+  adminUserId: string,
+  targetUserId: string,
+): Promise<void> => {
+  try {
+    const supabase = await createServerClient();
+    const admin = await profileRepository.hasAdminRole(supabase, adminUserId);
+    if (!admin) {
+      log.warn({ adminUserId }, 'unlockPredictionForAdmin: not admin');
+      throw new Error('Forbidden');
+    }
+    const pred = await predictionRepository.getPredictionByUserId(supabase, targetUserId);
+    if (!pred) throw new Error('No prediction found for this user');
+    await predictionRepository.unlockPredictionRow(supabase, pred.id);
+    log.info({ adminUserId, targetUserId, predictionId: pred.id }, 'unlockPredictionForAdmin');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ adminUserId, targetUserId, err: message }, 'unlockPredictionForAdmin failed');
+    throw err instanceof Error ? err : new Error('unlockPredictionForAdmin failed');
+  }
+};
+
+export const lockPredictionForAdmin = async (
+  adminUserId: string,
+  targetUserId: string,
+): Promise<void> => {
+  try {
+    const supabase = await createServerClient();
+    const admin = await profileRepository.hasAdminRole(supabase, adminUserId);
+    if (!admin) {
+      log.warn({ adminUserId }, 'lockPredictionForAdmin: not admin');
+      throw new Error('Forbidden');
+    }
+    const pred = await predictionRepository.getPredictionByUserId(supabase, targetUserId);
+    if (!pred) throw new Error('No prediction found for this user');
+    await predictionRepository.lockPredictionRow(supabase, pred.id);
+    log.info({ adminUserId, targetUserId, predictionId: pred.id }, 'lockPredictionForAdmin');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ adminUserId, targetUserId, err: message }, 'lockPredictionForAdmin failed');
+    throw err instanceof Error ? err : new Error('lockPredictionForAdmin failed');
   }
 };
 

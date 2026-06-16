@@ -41,6 +41,7 @@ export interface UserPrediction {
   specialPredictions: SpecialPrediction;
   predictedGroupStandings: Map<GroupName, string[]>;
   isLocked: boolean;
+  adminUnlocked: boolean;
   submittedAt: string | null;
   updatedAt: string;
 }

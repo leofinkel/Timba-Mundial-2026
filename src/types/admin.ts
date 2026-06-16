@@ -53,6 +53,8 @@ export interface AdminSubmittedPredictionUser {
   displayName: string;
   email: string;
   avatarUrl: string | null;
+  isLocked: boolean;
+  adminUnlocked: boolean;
   submittedAt: string;
   updatedAt: string;
 }

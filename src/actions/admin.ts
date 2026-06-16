@@ -33,6 +33,8 @@ import {
 import {
   deleteUserPredictionForAdmin,
   getUserPredictionForAdmin,
+  lockPredictionForAdmin,
+  unlockPredictionForAdmin,
 } from '@/services/predictionService';
 import { syncAllSavedPredictionsBracketLogic } from '@/services/syncSavedPredictionsBracket';
 import type { UserPredictionView } from '@/types/prediction';
@@ -600,6 +602,66 @@ export const syncSavedPredictionsBracketAdminAction = async (): Promise<
     return { success: true, data };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+};
+
+export const unlockUserPredictionAsAdminAction = async (
+  targetUserId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    await unlockPredictionForAdmin(user.id, parsed.data);
+
+    revalidatePath('/admin');
+    revalidatePath('/fixture');
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    if (message === 'Forbidden') return { success: false, error: 'Forbidden' };
+    return { success: false, error: message };
+  }
+};
+
+export const lockUserPredictionAsAdminAction = async (
+  targetUserId: string,
+): Promise<{ success: true; data: null } | { success: false; error: string }> => {
+  try {
+    const parsed = targetUserIdSchema.safeParse(targetUserId);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'ID inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) return { success: false, error: authError.message };
+    if (!user) return { success: false, error: 'Not authenticated' };
+    if (!(await isAdmin(user.id))) return { success: false, error: 'Forbidden' };
+
+    await lockPredictionForAdmin(user.id, parsed.data);
+
+    revalidatePath('/admin');
+    revalidatePath('/fixture');
+    return { success: true, data: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    if (message === 'Forbidden') return { success: false, error: 'Forbidden' };
     return { success: false, error: message };
   }
 };

@@ -2,12 +2,17 @@
 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, Trash2 } from 'lucide-react';
+import { Eye, Lock, LockOpen, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { deleteUserPredictionAsAdminAction, syncSavedPredictionsBracketAdminAction } from '@/actions/admin';
+import {
+  deleteUserPredictionAsAdminAction,
+  lockUserPredictionAsAdminAction,
+  syncSavedPredictionsBracketAdminAction,
+  unlockUserPredictionAsAdminAction,
+} from '@/actions/admin';
 import { OtherUserPredictionsDialog } from '@/components/rankings/OtherUserPredictionsDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -55,6 +60,7 @@ export const AdminSubmittedPredictionsTab = ({
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [deletePending, setDeletePending] = useState(false);
   const [syncPending, setSyncPending] = useState(false);
+  const [lockPendingId, setLockPendingId] = useState<string | null>(null);
 
   const resetDeleteDialog = () => {
     setDeleteTarget(null);
@@ -79,6 +85,30 @@ export const AdminSubmittedPredictionsTab = ({
       return;
     }
     toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
+  };
+
+  const handleUnlock = async (u: AdminSubmittedPredictionUser) => {
+    setLockPendingId(u.userId);
+    const res = await unlockUserPredictionAsAdminAction(u.userId);
+    setLockPendingId(null);
+    if (res.success) {
+      toast.success(`Pronóstico de ${u.displayName} desbloqueado.`);
+      router.refresh();
+    } else {
+      toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
+    }
+  };
+
+  const handleLock = async (u: AdminSubmittedPredictionUser) => {
+    setLockPendingId(u.userId);
+    const res = await lockUserPredictionAsAdminAction(u.userId);
+    setLockPendingId(null);
+    if (res.success) {
+      toast.success(`Pronóstico de ${u.displayName} bloqueado.`);
+      router.refresh();
+    } else {
+      toast.error(res.error === 'Forbidden' ? 'No tenés permiso.' : res.error);
+    }
   };
 
   const handleSyncBracket = async () => {
@@ -131,6 +161,7 @@ export const AdminSubmittedPredictionsTab = ({
             <TableRow className="border-zinc-800/80 hover:bg-transparent">
               <TableHead>Jugador</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Estado</TableHead>
               <TableHead>Último guardado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -138,7 +169,7 @@ export const AdminSubmittedPredictionsTab = ({
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
+                <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
                   Todavía nadie guardó el fixture.
                 </TableCell>
               </TableRow>
@@ -161,6 +192,23 @@ export const AdminSubmittedPredictionsTab = ({
                   <TableCell className="text-muted-foreground max-w-[220px] truncate text-sm">
                     {u.email}
                   </TableCell>
+                  <TableCell>
+                    {u.isLocked ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+                        <Lock className="size-3" aria-hidden />
+                        Bloqueada
+                      </span>
+                    ) : u.adminUnlocked ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-900/40 px-2 py-0.5 text-xs text-amber-300">
+                        <LockOpen className="size-3" aria-hidden />
+                        Desbloqueada
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-300">
+                        Editable
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {format(parseISO(u.updatedAt), "d MMM yyyy, HH:mm", { locale: es })}
                   </TableCell>
@@ -179,6 +227,31 @@ export const AdminSubmittedPredictionsTab = ({
                         <Eye className="mr-1 size-4" aria-hidden />
                         Ver
                       </Button>
+                      {u.isLocked || (!u.isLocked && !u.adminUnlocked) ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-amber-700/60 text-amber-300 hover:bg-amber-950/40 hover:text-amber-200"
+                          disabled={lockPendingId === u.userId}
+                          onClick={() => void handleUnlock(u)}
+                        >
+                          <LockOpen className="mr-1 size-4" aria-hidden />
+                          {lockPendingId === u.userId ? 'Desbloqueando…' : 'Desbloquear'}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+                          disabled={lockPendingId === u.userId}
+                          onClick={() => void handleLock(u)}
+                        >
+                          <Lock className="mr-1 size-4" aria-hidden />
+                          {lockPendingId === u.userId ? 'Bloqueando…' : 'Bloquear'}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outline"

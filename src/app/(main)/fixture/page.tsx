@@ -36,8 +36,9 @@ const FixturePage = async () => {
 
   const deadlinePassed = Date.now() > deadlineDate.getTime();
   const isLocked = prediction?.isLocked ?? false;
+  const adminUnlocked = prediction?.adminUnlocked ?? false;
   const isPaid = user?.paymentStatus === 'paid';
-  const canSave = isPaid && !isLocked && !deadlinePassed;
+  const canSave = isPaid && !isLocked && (!deadlinePassed || adminUnlocked);
 
   let saveDisabledReason: string | undefined;
   if (!user) {
@@ -46,7 +47,7 @@ const FixturePage = async () => {
     saveDisabledReason = 'Pagá la entrada para poder guardar tu predicción.';
   } else if (isLocked) {
     saveDisabledReason = 'Tu predicción está bloqueada.';
-  } else if (deadlinePassed) {
+  } else if (deadlinePassed && !adminUnlocked) {
     saveDisabledReason = 'Pasó la fecha límite para guardar cambios.';
   }
 
@@ -94,7 +95,7 @@ const FixturePage = async () => {
         )}
       </div>
 
-      {(deadlinePassed || isLocked) && (
+      {(deadlinePassed || isLocked) && !adminUnlocked && (
         <Card className="relative mx-auto w-full max-w-6xl border-amber-500/30 bg-amber-500/10 shadow-sm">
           <CardHeader className="py-3">
             <CardTitle className="text-base text-amber-200">Importante</CardTitle>
@@ -102,6 +103,16 @@ const FixturePage = async () => {
               {deadlinePassed
                 ? 'El plazo oficial de predicciones finalizó. Solo podrás ver tu planilla cuando el editor esté listo.'
                 : 'Tu planilla está bloqueada: no se aplicarán nuevos cambios.'}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+      {adminUnlocked && !isLocked && (
+        <Card className="relative mx-auto w-full max-w-6xl border-emerald-500/30 bg-emerald-500/10 shadow-sm">
+          <CardHeader className="py-3">
+            <CardTitle className="text-base text-emerald-200">Edición habilitada</CardTitle>
+            <CardDescription className="text-emerald-100/90">
+              Un administrador habilitó la edición de tu planilla. Podés guardar cambios hasta que se bloquee nuevamente.
             </CardDescription>
           </CardHeader>
         </Card>
