@@ -364,6 +364,7 @@ export const getOtherUserPredictionForViewer = async (
         buildStandingsMap(standingRows),
       ) as UserPredictionView['predictedGroupStandings'],
       isLocked: pred.is_locked,
+      adminUnlocked: pred.admin_unlocked,
       submittedAt: pred.submitted_at,
       updatedAt: pred.updated_at,
     };
