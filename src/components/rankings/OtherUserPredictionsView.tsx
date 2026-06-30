@@ -63,8 +63,7 @@ export const OtherUserPredictionsView = ({
     return map;
   }, [tournament]);
 
-  const labelForTeamId = (id: string, fallbackFromMatch: string | null) => {
-    if (fallbackFromMatch) return fallbackFromMatch;
+  const labelForTeamId = (id: string) => {
     if (!id) return 'Por definir';
     const t = teamById.get(id);
     return t ? `${t.name} (${t.code})` : id;
@@ -141,14 +140,8 @@ export const OtherUserPredictionsView = ({
                 <ul className="divide-y divide-zinc-800/80 rounded-md border border-zinc-800/80">
                   {matches.map((m) => {
                     const pr = koPredByMatchId.get(m.id);
-                    const homeLabel = labelForTeamId(
-                      pr?.homeTeamId ?? '',
-                      m.homeTeam ? `${m.homeTeam.name} (${m.homeTeam.code})` : null,
-                    );
-                    const awayLabel = labelForTeamId(
-                      pr?.awayTeamId ?? '',
-                      m.awayTeam ? `${m.awayTeam.name} (${m.awayTeam.code})` : null,
-                    );
+                    const homeLabel = labelForTeamId(pr?.homeTeamId ?? '');
+                    const awayLabel = labelForTeamId(pr?.awayTeamId ?? '');
                     return (
                       <li
                         key={m.id}
