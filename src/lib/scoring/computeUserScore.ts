@@ -89,6 +89,26 @@ export type OfficialHonorFromBracket = {
   fourth_place_team_id: string | null;
 };
 
+/** 1.º/2.º o 3.º/4.º predicho desde goles del pronóstico y slots pred_home/pred_away. */
+export const predictedHonorPairFromPredMatch = (
+  pred: PredMatch | undefined,
+): { first: string | null; second: string | null } => {
+  if (!pred) return { first: null, second: null };
+  const homeTeamId = pred.pred_home_team_id ?? null;
+  const awayTeamId = pred.pred_away_team_id ?? null;
+  if (!homeTeamId || !awayTeamId) return { first: null, second: null };
+
+  const first = predictedWinner(pred, {
+    home_team_id: homeTeamId,
+    away_team_id: awayTeamId,
+    home_goals: null,
+    away_goals: null,
+    winner_team_id: null,
+  });
+  if (!first) return { first: null, second: null };
+  return { first, second: loserInMatch(homeTeamId, awayTeamId, first) };
+};
+
 export const loserInMatch = (
   homeTeamId: string | null,
   awayTeamId: string | null,
@@ -404,29 +424,8 @@ export const scoreHonorFromBracket = (
   const predFinal = preds.find((p) => p.match_id === finalM.id);
   const predThird = thirdM?.id ? preds.find((p) => p.match_id === thirdM.id) : undefined;
 
-  const predictedHonorPair = (
-    pred: PredMatch | undefined,
-    official: MatchRow | undefined,
-  ): { first: string | null; second: string | null } => {
-    if (!pred) return { first: null, second: null };
-    const homeTeamId = pred.pred_home_team_id ?? official?.home_team_id ?? null;
-    const awayTeamId = pred.pred_away_team_id ?? official?.away_team_id ?? null;
-    if (!homeTeamId || !awayTeamId) return { first: null, second: null };
-
-    const first = predictedWinner(pred, {
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      home_goals: null,
-      away_goals: null,
-      winner_team_id: null,
-    });
-    if (!first) return { first: null, second: null };
-    const second = loserInMatch(homeTeamId, awayTeamId, first);
-    return { first, second };
-  };
-
-  const predictedFinal = predictedHonorPair(predFinal, finalM);
-  const predictedThird = predictedHonorPair(predThird, thirdM);
+  const predictedFinal = predictedHonorPairFromPredMatch(predFinal);
+  const predictedThird = predictedHonorPairFromPredMatch(predThird);
 
   let champion = 0;
   if (

@@ -4,7 +4,7 @@ import { isViewOthersPredictionsWindowOpen, PREDICTION_DEADLINE } from '@/consta
 import type { GroupMatchScoresInput } from '@/lib/fixture/computeGroupStandingsFromPredictions';
 import { buildCalculatedStandingsForPrediction } from '@/lib/fixture/buildCalculatedStandingsForPrediction';
 import { isGroupStagePredictionComplete } from '@/lib/fixture/isGroupStagePredictionComplete';
-import { honorPairFromWinnerAndOpponent } from '@/lib/knockout/honorMatchPrediction';
+import { goalsAndWinnerForHonorFirst, honorPairFromWinnerAndOpponent } from '@/lib/knockout/honorMatchPrediction';
 import { buildPredictionBestThirdQualifierRows } from '@/lib/knockout/buildPredictionBestThirdQualifierRows';
 import { resolvePredictionKnockoutBracket } from '@/lib/knockout/resolvePredictionKnockoutBracket';
 import { predictedWinner } from '@/lib/scoring/computeUserScore';
@@ -560,21 +560,25 @@ export const savePredictions = async (
         const client = clientKoById.get(m.id);
         const ha = resolved.homeAwayByMatchId.get(m.id);
         let winnerId = resolved.winnerByMatchId.get(m.id) ?? null;
-        if (
-          (m.matchNumber === 103 || m.matchNumber === 104) &&
-          client?.winnerId &&
-          ha
-        ) {
-          const c = client.winnerId;
-          if (c === ha.home || c === ha.away) {
-            winnerId = c;
+        let homeGoals = client?.homeGoals ?? 0;
+        let awayGoals = client?.awayGoals ?? 0;
+
+        if ((m.matchNumber === 103 || m.matchNumber === 104) && ha?.home && ha?.away) {
+          const honorFirst =
+            client?.honorFirstTeamId?.trim() || client?.winnerId?.trim() || '';
+          if (honorFirst === ha.home || honorFirst === ha.away) {
+            winnerId = honorFirst;
+            const goals = goalsAndWinnerForHonorFirst(ha.home, ha.away, honorFirst);
+            homeGoals = goals.homeGoals;
+            awayGoals = goals.awayGoals;
           }
         }
+
         await predictionRepository.upsertPredictionMatch(supabase, {
           prediction_id: pred.id,
           match_id: m.id,
-          home_goals: client?.homeGoals ?? 0,
-          away_goals: client?.awayGoals ?? 0,
+          home_goals: homeGoals,
+          away_goals: awayGoals,
           winner_team_id: winnerId,
           pred_home_team_id: ha?.home?.trim() ? ha.home : null,
           pred_away_team_id: ha?.away?.trim() ? ha.away : null,

@@ -2,9 +2,8 @@ import 'server-only';
 
 import { SCORING_RULES } from '@/constants/scoring';
 import {
-  predictedWinner,
+  predictedHonorPairFromPredMatch,
   resolveOfficialHonor,
-  loserInMatch,
 } from '@/lib/scoring/computeUserScore';
 import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { fetchAllPages } from '@/lib/supabase/fetchAllPages';
@@ -203,35 +202,6 @@ const scoreKnockoutQualifiedTeams = (
   return out;
 };
 
-const predictedHonorPairFromMatch = (
-  predMatch: PredMatchRow | undefined,
-): { first: string | null; second: string | null } => {
-  if (!predMatch) return { first: null, second: null };
-  const homeTeamId = predMatch.pred_home_team_id;
-  const awayTeamId = predMatch.pred_away_team_id;
-  if (!homeTeamId || !awayTeamId) return { first: null, second: null };
-
-  const winner = predictedWinner(
-    {
-      match_id: predMatch.match_id,
-      home_goals: predMatch.home_goals,
-      away_goals: predMatch.away_goals,
-      winner_team_id: predMatch.winner_team_id,
-    },
-    {
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      home_goals: null,
-      away_goals: null,
-      winner_team_id: null,
-    },
-  );
-
-  if (!winner) return { first: null, second: null };
-  const second = loserInMatch(homeTeamId, awayTeamId, winner);
-  return { first: winner, second };
-};
-
 /** Final 1–4 per group from group_standings; only groups with exactly 4 rows count. */
 const buildFinalGroupPositions = (
   rows: { group_id: string; team_id: string; position: number }[],
@@ -347,8 +317,8 @@ const computeForPrediction = (params: {
   const honor = resolveOfficialHonor(params.matches, params.real);
   const rr = params.real;
 
-  const predictedFinalHonor = predictedHonorPairFromMatch(finalPred);
-  const predictedThirdHonor = predictedHonorPairFromMatch(thirdPred);
+  const predictedFinalHonor = predictedHonorPairFromPredMatch(finalPred);
+  const predictedThirdHonor = predictedHonorPairFromPredMatch(thirdPred);
 
   if (honor.champion_team_id && predictedFinalHonor.first) {
     if (predictedFinalHonor.first === honor.champion_team_id) {
