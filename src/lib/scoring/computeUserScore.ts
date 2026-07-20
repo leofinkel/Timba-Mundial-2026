@@ -1,6 +1,6 @@
 import { SCORING_RULES } from '@/constants/scoring';
 import { orderGroupStandings } from '@/lib/fixture/groupStandingsOrdering';
-import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
+import { specialPredictionNamesMatch } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import type { MatchRow } from '@/repositories/matchRepository';
 
 /** Mínimo para 103/104: compatible con el `MatchRow` “delgado” de scoringService. */
@@ -386,18 +386,10 @@ export const scoreSpecialStrings = (
   if (!real) return { top: 0, best: 0 };
   let top = 0;
   let best = 0;
-  if (
-    real.top_scorer &&
-    normalizeSpecialPredictionPlayerName(predTop) ===
-      normalizeSpecialPredictionPlayerName(real.top_scorer)
-  ) {
+  if (real.top_scorer && specialPredictionNamesMatch(predTop, real.top_scorer)) {
     top = SCORING_RULES.honorBoard.topScorer;
   }
-  if (
-    real.best_player &&
-    normalizeSpecialPredictionPlayerName(predBest) ===
-      normalizeSpecialPredictionPlayerName(real.best_player)
-  ) {
+  if (real.best_player && specialPredictionNamesMatch(predBest, real.best_player)) {
     best = SCORING_RULES.honorBoard.bestPlayer;
   }
   return { top, best };

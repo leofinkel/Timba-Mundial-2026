@@ -5,7 +5,7 @@ import {
   predictedHonorPairFromPredMatch,
   resolveOfficialHonor,
 } from '@/lib/scoring/computeUserScore';
-import { normalizeSpecialPredictionPlayerName } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
+import { specialPredictionNamesMatch } from '@/lib/scoring/normalizeSpecialPredictionPlayerName';
 import { fetchAllPages } from '@/lib/supabase/fetchAllPages';
 import { createServiceLogger } from '@/lib/logger';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -345,17 +345,12 @@ const computeForPrediction = (params: {
   }
 
   if (params.specials && rr) {
-    if (
-      rr.top_scorer &&
-      normalizeSpecialPredictionPlayerName(params.specials.top_scorer) ===
-        normalizeSpecialPredictionPlayerName(rr.top_scorer)
-    ) {
+    if (rr.top_scorer && specialPredictionNamesMatch(params.specials.top_scorer, rr.top_scorer)) {
       b.topScorerPoints += SCORING_RULES.honorBoard.topScorer;
     }
     if (
       rr.best_player &&
-      normalizeSpecialPredictionPlayerName(params.specials.best_player) ===
-        normalizeSpecialPredictionPlayerName(rr.best_player)
+      specialPredictionNamesMatch(params.specials.best_player, rr.best_player)
     ) {
       b.bestPlayerPoints += SCORING_RULES.honorBoard.bestPlayer;
     }

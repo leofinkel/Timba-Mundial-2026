@@ -11,3 +11,16 @@ export const normalizeSpecialPredictionPlayerName = (s: string): string =>
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
+
+/**
+ * Compares goleador / figura names, accepting either "Nombre Apellido" or
+ * just "Apellido" on either side (falls back to matching the last word).
+ */
+export const specialPredictionNamesMatch = (a: string, b: string): boolean => {
+  const na = normalizeSpecialPredictionPlayerName(a);
+  const nb = normalizeSpecialPredictionPlayerName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const lastWord = (s: string) => s.slice(s.lastIndexOf(' ') + 1);
+  return lastWord(na) === lastWord(nb);
+};
